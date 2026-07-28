@@ -15,13 +15,23 @@ export async function createInterviewByCandidateId(req, res) {
     const hostUser = req.user;
 
     if (!candidateId || !problem || !difficulty) {
-      return res.status(400).json({ message: "Candidate ID, primary problem, and difficulty are required." });
+      return res.status(400).json({ message: "Candidate Key/Email, primary problem, and difficulty are required." });
     }
 
-    // 1. Validate Candidate exists
-    const candidateUser = await User.findOne({ candidateId: candidateId.trim().toUpperCase() });
+    const cleanKey = candidateId.trim();
+
+    // 1. Validate Candidate exists by candidateId, candidateKey, email, or clerkId
+    const candidateUser = await User.findOne({
+      $or: [
+        { candidateId: new RegExp(`^${cleanKey}$`, "i") },
+        { candidateKey: new RegExp(`^${cleanKey}$`, "i") },
+        { email: new RegExp(`^${cleanKey}$`, "i") },
+        { clerkId: cleanKey },
+      ],
+    });
+
     if (!candidateUser) {
-      return res.status(404).json({ message: `Candidate with ID "${candidateId}" does not exist.` });
+      return res.status(404).json({ message: `Candidate with Key/Email "${candidateId}" does not exist.` });
     }
 
     // 2. Generate unique identifiers
@@ -37,7 +47,7 @@ export async function createInterviewByCandidateId(req, res) {
       secondaryDifficulty: secondaryDifficulty || "",
       host: hostUser._id,
       participant: candidateUser._id,
-      candidateId: candidateUser.candidateId,
+      candidateId: candidateUser.candidateKey || candidateUser.candidateId,
       status: "active",
       callId,
       durationMinutes: durationMinutes || 45,
@@ -75,7 +85,7 @@ export async function createInterviewByCandidateId(req, res) {
     });
 
     notification = await Notification.findById(notification._id)
-      .populate("sender", "name profileImage email candidateId")
+      .populate("sender", "name profileImage email candidateId candidateKey")
       .populate("interview");
 
     // 6. Broadcast live socket notification to Candidate
@@ -93,7 +103,7 @@ export async function createInterviewByCandidateId(req, res) {
     await Activity.create({
       userId: hostUser._id,
       action: "INTERVIEW_CREATED",
-      details: `Created interview ${interviewId} with candidate ${candidateUser.candidateId} for problems ${problemText}`,
+      details: `Created interview ${interviewId} with candidate ${candidateUser.candidateKey || candidateUser.candidateId} for problems ${problemText}`,
       metadata: { sessionId: session._id },
     });
 
@@ -103,7 +113,7 @@ export async function createInterviewByCandidateId(req, res) {
       candidate: {
         name: candidateUser.name,
         email: candidateUser.email,
-        candidateId: candidateUser.candidateId,
+        candidateId: candidateUser.candidateKey || candidateUser.candidateId,
       },
       message: `Interview created and notification sent to ${candidateUser.name}`,
     });
@@ -120,8 +130,8 @@ export async function getCandidateInterviews(req, res) {
     const sessions = await Session.find({
       $or: [{ participant: candidateId }, { host: candidateId }],
     })
-      .populate("host", "name profileImage email clerkId candidateId")
-      .populate("participant", "name profileImage email clerkId candidateId")
+      .populate("host", "name profileImage email clerkId candidateId candidateKey")
+      .populate("participant", "name profileImage email clerkId candidateId candidateKey")
       .sort({ createdAt: -1 });
 
     res.status(200).json({ sessions });
@@ -136,8 +146,8 @@ export async function getHostInterviews(req, res) {
     const hostId = req.user._id;
 
     const sessions = await Session.find({ host: hostId })
-      .populate("host", "name profileImage email clerkId candidateId")
-      .populate("participant", "name profileImage email clerkId candidateId")
+      .populate("host", "name profileImage email clerkId candidateId candidateKey")
+      .populate("participant", "name profileImage email clerkId candidateId candidateKey")
       .sort({ createdAt: -1 });
 
     res.status(200).json({ sessions });

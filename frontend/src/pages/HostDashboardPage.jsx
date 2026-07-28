@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router";
 import { AppLayout } from "../components/layout/AppLayout";
 import { Card } from "../components/ui/Card";
-import { Badge, getDifficultyBadgeVariant } from "../components/ui/Badge";
+import { Badge } from "../components/ui/Badge";
 import { Button } from "../components/ui/Button";
 import CandidateIdLookup from "../components/CandidateIdLookup";
 import CreateInterviewModal from "../components/CreateInterviewModal";
@@ -11,21 +12,21 @@ import {
   Plus,
   Users,
   CheckCircle2,
-  BookOpen,
   Search,
   Loader2,
   UserCheck,
-  Calendar,
   ChevronLeft,
   ChevronRight,
-  Sparkles,
 } from "lucide-react";
 import { PROBLEMS } from "../data/problems";
 import { useActiveSessions, useMyRecentSessions } from "../hooks/useSessions";
+import { useDbUser } from "../context/UserContext";
 import axios from "../lib/axios";
 
 // Candidate card in the host directory
 function CandidateCard({ candidate, onSchedule }) {
+  const candidateKey = candidate.candidateKey || candidate.candidateId || "CAND-PENDING";
+
   return (
     <div className="p-4 rounded-2xl bg-white border border-slate-200/80 hover:border-emerald-300/60 hover:shadow-md transition-all flex items-center justify-between gap-3">
       <div className="flex items-center gap-3 min-w-0">
@@ -44,10 +45,10 @@ function CandidateCard({ candidate, onSchedule }) {
         <div className="min-w-0">
           <p className="text-sm font-bold text-slate-900 truncate">{candidate.name}</p>
           <p className="text-xs text-slate-500 truncate">{candidate.email}</p>
-          <div className="mt-1">
+          <div className="mt-1 flex items-center gap-1.5">
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/60 font-mono text-[10px] font-bold">
               <UserCheck className="size-2.5" />
-              {candidate.candidateId}
+              {candidateKey}
             </span>
           </div>
         </div>
@@ -67,6 +68,8 @@ function CandidateCard({ candidate, onSchedule }) {
 }
 
 export default function HostDashboardPage() {
+  const navigate = useNavigate();
+  const { dbUser, loadingDbUser } = useDbUser();
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [selectedCandidateId, setSelectedCandidateId] = useState("");
   const [candidates, setCandidates] = useState([]);
@@ -80,12 +83,18 @@ export default function HostDashboardPage() {
   const { data: recentSessionsData } = useMyRecentSessions();
   const activeSessions = activeSessionsData?.sessions || [];
   const recentSessions = recentSessionsData?.sessions || [];
-  const problemsList = Object.values(PROBLEMS);
+
+  // Role Guard: Only Host can access Host Dashboard
+  useEffect(() => {
+    if (!loadingDbUser && dbUser && dbUser.role === "candidate") {
+      navigate("/candidate-dashboard");
+    }
+  }, [dbUser, loadingDbUser, navigate]);
 
   const fetchCandidates = async (search = "", page = 1) => {
     setLoadingCandidates(true);
     try {
-      const res = await axios.get(`/users/candidates?search=${encodeURIComponent(search)}&page=${page}&limit=8`);
+      const res = await axios.get(`/users/candidates?search=${encodeURIComponent(search)}&page=${page}&limit=50`);
       setCandidates(res.data.candidates || []);
       setTotalCandidates(res.data.total || 0);
       setTotalPages(res.data.totalPages || 1);
@@ -97,22 +106,39 @@ export default function HostDashboardPage() {
   };
 
   useEffect(() => {
-    fetchCandidates(candidateSearch, candidatePage);
-  }, [candidatePage]);
+    if (dbUser?.role === "host") {
+      fetchCandidates(candidateSearch, candidatePage);
+    }
+  }, [candidatePage, dbUser?.role]);
 
   // Search with debounce
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setCandidatePage(1);
-      fetchCandidates(candidateSearch, 1);
-    }, 350);
-    return () => clearTimeout(timer);
-  }, [candidateSearch]);
+    if (dbUser?.role === "host") {
+      const timer = setTimeout(() => {
+        setCandidatePage(1);
+        fetchCandidates(candidateSearch, 1);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [candidateSearch, dbUser?.role]);
 
   const handleSelectCandidate = (candidate) => {
-    setSelectedCandidateId(candidate.candidateId);
+    setSelectedCandidateId(candidate.candidateKey || candidate.candidateId);
     setShowCreateModal(true);
   };
+
+  if (loadingDbUser) {
+    return (
+      <div className="h-screen bg-slate-900 flex flex-col items-center justify-center text-white gap-3">
+        <Loader2 className="size-8 animate-spin text-emerald-500" />
+        <p className="text-sm font-semibold">Verifying Host Authorization...</p>
+      </div>
+    );
+  }
+
+  if (dbUser?.role !== "host") {
+    return null;
+  }
 
   return (
     <AppLayout onCreateSession={() => setShowCreateModal(true)}>
@@ -126,7 +152,7 @@ export default function HostDashboardPage() {
             </div>
             <h1 className="text-3xl font-extrabold tracking-tight">Host Dashboard</h1>
             <p className="text-slate-300 text-sm max-w-xl">
-              Browse and search registered candidates, schedule interviews, and manage your evaluation workflow.
+              Browse registered candidates, schedule 1-on-1 interviews, and manage live evaluation workflows.
             </p>
           </div>
           <Button
@@ -170,7 +196,7 @@ export default function HostDashboardPage() {
           </Card>
         </div>
 
-        {/* ─── Candidate Directory ────────────────────────────── */}
+        {/* Candidate Directory */}
         <Card className="p-6">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
             <div className="flex items-center gap-3">
@@ -179,7 +205,7 @@ export default function HostDashboardPage() {
               </div>
               <div>
                 <h2 className="text-base font-extrabold text-slate-900">Candidate Directory</h2>
-                <p className="text-xs text-slate-500">Browse all registered candidates and schedule interviews</p>
+                <p className="text-xs text-slate-500">Browse all registered candidate profiles to schedule interviews</p>
               </div>
             </div>
 
@@ -200,14 +226,14 @@ export default function HostDashboardPage() {
           {loadingCandidates ? (
             <div className="flex items-center justify-center py-12 text-slate-400 gap-2">
               <Loader2 className="size-5 animate-spin text-emerald-500" />
-              <span className="text-sm">Loading candidates...</span>
+              <span className="text-sm">Loading candidate directory...</span>
             </div>
           ) : candidates.length === 0 ? (
             <div className="text-center py-12 text-slate-400">
               <UserCheck className="size-8 mx-auto mb-2 opacity-40" />
               <p className="text-sm font-bold text-slate-600">No candidates found</p>
               <p className="text-xs mt-1">
-                {candidateSearch ? `No results for "${candidateSearch}"` : "No candidates have registered yet."}
+                {candidateSearch ? `No results for "${candidateSearch}"` : "No candidate profiles registered yet."}
               </p>
             </div>
           ) : (
@@ -226,7 +252,7 @@ export default function HostDashboardPage() {
           {totalPages > 1 && (
             <div className="flex items-center justify-between pt-4 mt-4 border-t border-slate-100">
               <p className="text-xs text-slate-500">
-                Showing {candidates.length} of {totalCandidates} candidates
+                Showing {candidates.length} of {totalCandidates} candidate profiles
               </p>
               <div className="flex items-center gap-2">
                 <Button
@@ -256,7 +282,7 @@ export default function HostDashboardPage() {
         {/* Quick Candidate ID Lookup */}
         <CandidateIdLookup
           onSelectCandidate={(cand) => {
-            setSelectedCandidateId(cand.candidateId);
+            setSelectedCandidateId(cand.candidateKey || cand.candidateId);
             setShowCreateModal(true);
           }}
         />

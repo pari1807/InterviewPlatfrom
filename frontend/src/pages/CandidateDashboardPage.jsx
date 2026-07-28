@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { AppLayout } from "../components/layout/AppLayout";
 import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
@@ -26,6 +26,7 @@ import axios from "../lib/axios";
 import { getSocket } from "../lib/socket";
 import toast from "react-hot-toast";
 import { useUser } from "@clerk/clerk-react";
+import { useDbUser } from "../context/UserContext";
 
 // Invitation card shown to the candidate
 function InvitationCard({ notification, onJoin }) {
@@ -89,11 +90,19 @@ function InvitationCard({ notification, onJoin }) {
 }
 
 export default function CandidateDashboardPage() {
+  const navigate = useNavigate();
   const { user } = useUser();
+  const { dbUser, candidateKey, loadingDbUser } = useDbUser();
   const [notifications, setNotifications] = useState([]);
   const [loadingNotifications, setLoadingNotifications] = useState(true);
-  const [dbUser, setDbUser] = useState(null);
   const [copied, setCopied] = useState(false);
+
+  // Role Guard: Host accounts are redirected to Host Dashboard
+  useEffect(() => {
+    if (!loadingDbUser && dbUser && dbUser.role === "host") {
+      navigate("/host-dashboard");
+    }
+  }, [dbUser, loadingDbUser, navigate]);
 
   const fetchNotifications = async () => {
     try {
@@ -107,20 +116,9 @@ export default function CandidateDashboardPage() {
     }
   };
 
-  const fetchUser = async () => {
-    try {
-      const res = await axios.get("/users/me");
-      setDbUser(res.data?.user || null);
-    } catch (err) {
-      console.log("Error fetching user:", err.message);
-    }
-  };
-
   useEffect(() => {
     fetchNotifications();
-    fetchUser();
 
-    // Real-time new notification via Socket.io
     const socket = getSocket();
     if (user?.id) socket.emit("register_user", { userId: user.id });
 
@@ -157,9 +155,10 @@ export default function CandidateDashboardPage() {
   };
 
   const handleCopyId = () => {
-    if (!dbUser?.candidateId) return;
-    navigator.clipboard.writeText(dbUser.candidateId);
+    if (!candidateKey) return;
+    navigator.clipboard.writeText(candidateKey);
     setCopied(true);
+    toast.success("Candidate Key copied to clipboard!");
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -167,6 +166,19 @@ export default function CandidateDashboardPage() {
     ? notifications.filter((n) => n && typeof n === "object")
     : [];
   const pendingInvitations = safeNotifications.filter((n) => !n.isRead && n.type === "invitation");
+
+  if (loadingDbUser) {
+    return (
+      <div className="h-screen bg-slate-900 flex flex-col items-center justify-center text-white gap-3">
+        <Loader2 className="size-8 animate-spin text-emerald-500" />
+        <p className="text-sm font-semibold">Loading Candidate Dashboard...</p>
+      </div>
+    );
+  }
+
+  if (dbUser?.role === "host") {
+    return null;
+  }
 
   return (
     <AppLayout>
@@ -197,7 +209,7 @@ export default function CandidateDashboardPage() {
                 Your Candidate Key
               </p>
               <p className="text-xl font-extrabold text-white font-mono tracking-widest">
-                {dbUser?.candidateId || "Loading..."}
+                {candidateKey || "CAND-..."}
               </p>
             </div>
             {copied ? (

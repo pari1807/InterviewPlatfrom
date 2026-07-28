@@ -39,13 +39,24 @@ export async function setUserRole(req, res) {
 export async function findCandidateById(req, res) {
   try {
     const { candidateId } = req.params;
+    if (!candidateId) {
+      return res.status(400).json({ message: "Candidate Key or Email is required." });
+    }
+
+    const cleanKey = candidateId.trim();
 
     const candidate = await User.findOne({
-      candidateId: candidateId.trim().toUpperCase(),
-    }).select("name email profileImage clerkId candidateId role createdAt");
+      $or: [
+        { candidateId: new RegExp(`^${cleanKey}$`, "i") },
+        { candidateKey: new RegExp(`^${cleanKey}$`, "i") },
+        { email: new RegExp(`^${cleanKey}$`, "i") },
+        { clerkId: cleanKey },
+        { name: new RegExp(cleanKey, "i") },
+      ],
+    }).select("name email profileImage clerkId candidateId candidateKey role createdAt");
 
     if (!candidate) {
-      return res.status(404).json({ message: `Candidate with ID ${candidateId} not found.` });
+      return res.status(404).json({ message: `Candidate with Key/Email "${candidateId}" not found.` });
     }
 
     res.status(200).json({ candidate });
@@ -57,27 +68,39 @@ export async function findCandidateById(req, res) {
 
 export async function getAllCandidates(req, res) {
   try {
-    const { search = "", page = 1, limit = 20 } = req.query;
+    // Role filter: Only Host accounts can query the Candidate Directory
+    if (req.user.role !== "host") {
+      return res.status(403).json({
+        message: "Access denied. Only Host accounts can view the Candidate Directory.",
+      });
+    }
+
+    const { search = "", page = 1, limit = 50 } = req.query;
+    const currentUserId = req.user._id;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Build search filter
-    const filter = { role: "candidate" };
+    // Query: Return all registered users except current logged-in host
+    const query = {
+      _id: { $ne: currentUserId },
+    };
+
     if (search.trim()) {
       const regex = new RegExp(search.trim(), "i");
-      filter.$or = [
+      query.$or = [
         { name: regex },
         { email: regex },
         { candidateId: regex },
+        { candidateKey: regex },
       ];
     }
 
     const [candidates, total] = await Promise.all([
-      User.find(filter)
-        .select("name email profileImage clerkId candidateId role createdAt")
+      User.find(query)
+        .select("name email profileImage clerkId candidateId candidateKey role createdAt")
         .sort({ createdAt: -1 })
         .skip(skip)
         .limit(parseInt(limit)),
-      User.countDocuments(filter),
+      User.countDocuments(query),
     ]);
 
     res.status(200).json({

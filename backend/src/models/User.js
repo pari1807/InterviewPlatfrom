@@ -30,9 +30,24 @@ const userSchema = new mongoose.Schema(
       unique: true,
       sparse: true,
     },
+    candidateKey: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
   },
   { timestamps: true }
 );
+
+// Keep candidateId and candidateKey synchronized before saving
+userSchema.pre("save", function (next) {
+  if (this.candidateId && !this.candidateKey) {
+    this.candidateKey = this.candidateId;
+  } else if (this.candidateKey && !this.candidateId) {
+    this.candidateId = this.candidateKey;
+  }
+  next();
+});
 
 const User = mongoose.model("User", userSchema);
 

@@ -1,6 +1,7 @@
 import { useUser } from "@clerk/clerk-react";
 import { Navigate, Route, Routes } from "react-router";
 import { Toaster } from "react-hot-toast";
+import { UserProvider } from "./context/UserContext";
 import HomePage from "./pages/HomePage";
 import DashboardPage from "./pages/DashboardPage";
 import HostDashboardPage from "./pages/HostDashboardPage";
@@ -20,7 +21,7 @@ function App() {
   if (!isLoaded) return null;
 
   return (
-    <>
+    <UserProvider>
       <Routes>
         <Route path="/" element={!isSignedIn ? <HomePage /> : <Navigate to="/dashboard" />} />
         <Route path="/dashboard" element={isSignedIn ? <DashboardPage /> : <Navigate to="/" />} />
@@ -39,7 +40,7 @@ function App() {
       </Routes>
 
       <Toaster toastOptions={{ duration: 3000 }} />
-    </>
+    </UserProvider>
   );
 }
 
