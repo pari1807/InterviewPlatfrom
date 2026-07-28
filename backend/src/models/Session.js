@@ -16,6 +16,14 @@ const sessionSchema = new mongoose.Schema(
       enum: ["easy", "medium", "hard"],
       required: true,
     },
+    secondaryProblem: {
+      type: String,
+      default: "",
+    },
+    secondaryDifficulty: {
+      type: String,
+      default: "",
+    },
     host: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",

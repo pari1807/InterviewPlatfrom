@@ -57,12 +57,35 @@ export async function findCandidateById(req, res) {
 
 export async function getAllCandidates(req, res) {
   try {
-    const candidates = await User.find({ role: "candidate" })
-      .select("name email profileImage clerkId candidateId createdAt")
-      .sort({ createdAt: -1 })
-      .limit(30);
+    const { search = "", page = 1, limit = 20 } = req.query;
+    const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    res.status(200).json({ candidates });
+    // Build search filter
+    const filter = { role: "candidate" };
+    if (search.trim()) {
+      const regex = new RegExp(search.trim(), "i");
+      filter.$or = [
+        { name: regex },
+        { email: regex },
+        { candidateId: regex },
+      ];
+    }
+
+    const [candidates, total] = await Promise.all([
+      User.find(filter)
+        .select("name email profileImage clerkId candidateId role createdAt")
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(parseInt(limit)),
+      User.countDocuments(filter),
+    ]);
+
+    res.status(200).json({
+      candidates,
+      total,
+      page: parseInt(page),
+      totalPages: Math.ceil(total / parseInt(limit)),
+    });
   } catch (error) {
     console.error("getAllCandidates error:", error.message);
     res.status(500).json({ message: "Internal Server Error" });

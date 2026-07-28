@@ -11,11 +11,11 @@ function generateInterviewId() {
 
 export async function createInterviewByCandidateId(req, res) {
   try {
-    const { candidateId, problem, difficulty, durationMinutes } = req.body;
+    const { candidateId, problem, difficulty, secondaryProblem, secondaryDifficulty, durationMinutes } = req.body;
     const hostUser = req.user;
 
     if (!candidateId || !problem || !difficulty) {
-      return res.status(400).json({ message: "Candidate ID, problem, and difficulty are required." });
+      return res.status(400).json({ message: "Candidate ID, primary problem, and difficulty are required." });
     }
 
     // 1. Validate Candidate exists
@@ -33,6 +33,8 @@ export async function createInterviewByCandidateId(req, res) {
       interviewId,
       problem,
       difficulty,
+      secondaryProblem: secondaryProblem || "",
+      secondaryDifficulty: secondaryDifficulty || "",
       host: hostUser._id,
       participant: candidateUser._id,
       candidateId: candidateUser.candidateId,
@@ -62,20 +64,36 @@ export async function createInterviewByCandidateId(req, res) {
     }
 
     // 5. Create MongoDB Notification for Candidate
-    const notification = await Notification.create({
+    const problemText = secondaryProblem ? `"${problem}" & "${secondaryProblem}"` : `"${problem}"`;
+    let notification = await Notification.create({
       recipient: candidateUser._id,
       sender: hostUser._id,
       interview: session._id,
       title: "New Technical Interview Invitation",
-      message: `${hostUser.name} invited you to a live ${difficulty.toUpperCase()} technical interview for "${problem}".`,
+      message: `${hostUser.name} invited you to a live ${difficulty.toUpperCase()} technical interview featuring ${problemText}.`,
       type: "invitation",
     });
 
-    // 6. Log Activity in MongoDB
+    notification = await Notification.findById(notification._id)
+      .populate("sender", "name profileImage email candidateId")
+      .populate("interview");
+
+    // 6. Broadcast live socket notification to Candidate
+    try {
+      const io = req.app.get("io");
+      if (io) {
+        io.to(`user_${candidateUser.clerkId}`).emit("new_notification", notification);
+        io.to(`user_${candidateUser._id.toString()}`).emit("new_notification", notification);
+      }
+    } catch (socketErr) {
+      console.log("Socket notification broadcast non-fatal error:", socketErr.message);
+    }
+
+    // 7. Log Activity in MongoDB
     await Activity.create({
       userId: hostUser._id,
       action: "INTERVIEW_CREATED",
-      details: `Created interview ${interviewId} with candidate ${candidateUser.candidateId} for problem ${problem}`,
+      details: `Created interview ${interviewId} with candidate ${candidateUser.candidateId} for problems ${problemText}`,
       metadata: { sessionId: session._id },
     });
 

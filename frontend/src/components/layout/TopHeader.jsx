@@ -1,14 +1,57 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { UserButton, useUser } from "@clerk/clerk-react";
-import { Menu, Search, Plus, Bell, Copy, Check, Crown, UserCheck } from "lucide-react";
+import { Menu, Search, Plus, Bell, Copy, Check, Crown, UserCheck, Sparkles } from "lucide-react";
 import { Button } from "../ui/Button";
 import { Badge } from "../ui/Badge";
 import NotificationDrawer from "../NotificationDrawer";
+import axios from "../../lib/axios";
+import { getSocket } from "../../lib/socket";
 import toast from "react-hot-toast";
 
 export function TopHeader({ onOpenSidebar, onCreateSession, userRole, candidateId }) {
+  const { user } = useUser();
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  const fetchUnreadCount = async () => {
+    try {
+      const res = await axios.get("/notifications");
+      setUnreadCount(res.data.unreadCount || 0);
+    } catch (err) {
+      console.log("Error fetching unread count:", err.message);
+    }
+  };
+
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchUnreadCount();
+
+    const socket = getSocket();
+    // Register candidate/host socket with Clerk user ID
+    socket.emit("register_user", { userId: user.id, clerkId: user.id });
+
+    const handleNewNotif = (newNotif) => {
+      setUnreadCount((prev) => prev + 1);
+      toast.custom((t) => (
+        <div className="bg-slate-900 text-white p-4 rounded-2xl border border-emerald-500/40 shadow-2xl flex items-start gap-3 max-w-sm animate-fade-in">
+          <div className="p-2 bg-emerald-500/20 text-emerald-400 rounded-xl shrink-0">
+            <Sparkles className="size-5" />
+          </div>
+          <div>
+            <p className="font-bold text-sm text-emerald-300">{newNotif.title || "New Notification"}</p>
+            <p className="text-xs text-slate-300 mt-0.5">{newNotif.message}</p>
+          </div>
+        </div>
+      ));
+    };
+
+    socket.on("new_notification", handleNewNotif);
+
+    return () => {
+      socket.off("new_notification", handleNewNotif);
+    };
+  }, [user?.id]);
 
   const handleCopyCandidateId = () => {
     if (!candidateId) return;
@@ -85,11 +128,15 @@ export function TopHeader({ onOpenSidebar, onCreateSession, userRole, candidateI
           {/* Notification Bell Trigger */}
           <button
             onClick={() => setIsNotificationOpen(true)}
-            className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 relative"
+            className="p-2 rounded-xl text-slate-500 hover:text-slate-800 hover:bg-slate-100 relative transition-all"
             aria-label="Notifications"
           >
             <Bell className="size-5" />
-            <span className="absolute top-1.5 right-1.5 size-2 bg-emerald-500 rounded-full ring-2 ring-white" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 bg-emerald-600 text-white font-extrabold text-[10px] rounded-full flex items-center justify-center border-2 border-white shadow-sm animate-pulse">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
           </button>
 
           <div className="pl-2 border-l border-slate-200/80 flex items-center">
@@ -101,7 +148,11 @@ export function TopHeader({ onOpenSidebar, onCreateSession, userRole, candidateI
       {/* Notification Drawer */}
       <NotificationDrawer
         isOpen={isNotificationOpen}
-        onClose={() => setIsNotificationOpen(false)}
+        onClose={() => {
+          setIsNotificationOpen(false);
+          fetchUnreadCount();
+        }}
+        onUnreadCountChange={(count) => setUnreadCount(count)}
       />
     </>
   );

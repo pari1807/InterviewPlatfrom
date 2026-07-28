@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import { PROBLEMS } from "../data/problems";
-import { Code2, Loader2, Plus, X, Sparkles, UserCheck, ShieldCheck } from "lucide-react";
+import { Code2, Loader2, Plus, X, Sparkles, UserCheck, Layers } from "lucide-react";
 import { Button } from "./ui/Button";
-import { Badge, getDifficultyBadgeVariant } from "./ui/Badge";
 import axios from "../lib/axios";
 import toast from "react-hot-toast";
 
@@ -16,6 +15,8 @@ export default function CreateInterviewModal({
   const [candidateId, setCandidateId] = useState(initialCandidateId);
   const [problemTitle, setProblemTitle] = useState("");
   const [difficulty, setDifficulty] = useState("medium");
+  const [secondaryProblemTitle, setSecondaryProblemTitle] = useState("");
+  const [secondaryDifficulty, setSecondaryDifficulty] = useState("");
   const [durationMinutes, setDurationMinutes] = useState(45);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -23,7 +24,7 @@ export default function CreateInterviewModal({
 
   const handleSubmit = async () => {
     if (!candidateId.trim() || !problemTitle) {
-      toast.error("Please enter a Candidate ID and select a problem statement");
+      toast.error("Please enter a Candidate ID and select Question 1");
       return;
     }
 
@@ -34,6 +35,8 @@ export default function CreateInterviewModal({
         candidateId: candidateId.trim(),
         problem: problemTitle,
         difficulty,
+        secondaryProblem: secondaryProblemTitle || "",
+        secondaryDifficulty: secondaryDifficulty || "",
         durationMinutes,
       });
 
@@ -58,7 +61,7 @@ export default function CreateInterviewModal({
             </div>
             <div>
               <h3 className="font-extrabold text-xl text-slate-900">Schedule Candidate Interview</h3>
-              <p className="text-xs text-slate-500">Create a 1-on-1 session linked directly to Candidate ID</p>
+              <p className="text-xs text-slate-500">Select up to 2 DSA questions for the 1-on-1 interview</p>
             </div>
           </div>
 
@@ -89,10 +92,11 @@ export default function CreateInterviewModal({
             </div>
           </div>
 
-          {/* Problem Selection */}
+          {/* DSA Question 1 Selection */}
           <div className="space-y-1.5">
-            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600">
-              Select Problem Statement <span className="text-rose-500">*</span>
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center justify-between">
+              <span>DSA Question 1 (Primary) <span className="text-rose-500">*</span></span>
+              <span className="text-[10px] text-emerald-600 font-bold uppercase">Required</span>
             </label>
             <select
               className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-xs sm:text-sm font-medium focus:outline-none focus:border-emerald-500 cursor-pointer"
@@ -104,13 +108,41 @@ export default function CreateInterviewModal({
               }}
             >
               <option value="" disabled>
-                Choose coding problem...
+                Select Question 1...
               </option>
               {problems.map((prob) => (
                 <option key={prob.id} value={prob.title}>
                   {prob.title} ({prob.difficulty}) - {prob.category}
                 </option>
               ))}
+            </select>
+          </div>
+
+          {/* DSA Question 2 Selection */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 flex items-center justify-between">
+              <span>DSA Question 2 (Follow-up)</span>
+              <span className="text-[10px] text-slate-400 font-medium">Optional</span>
+            </label>
+            <select
+              className="w-full px-4 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-800 text-xs sm:text-sm font-medium focus:outline-none focus:border-emerald-500 cursor-pointer"
+              value={secondaryProblemTitle}
+              onChange={(e) => {
+                const selected = problems.find((p) => p.title === e.target.value);
+                setSecondaryProblemTitle(e.target.value);
+                if (selected) setSecondaryDifficulty(selected.difficulty.toLowerCase());
+              }}
+            >
+              <option value="">
+                (None - Single Question Interview)
+              </option>
+              {problems
+                .filter((prob) => prob.title !== problemTitle)
+                .map((prob) => (
+                  <option key={prob.id} value={prob.title}>
+                    {prob.title} ({prob.difficulty}) - {prob.category}
+                  </option>
+                ))}
             </select>
           </div>
 
@@ -126,7 +158,7 @@ export default function CreateInterviewModal({
             >
               <option value={30}>30 Minutes</option>
               <option value={45}>45 Minutes (Standard)</option>
-              <option value={60}>60 Minutes (Deep Dive)</option>
+              <option value={60}>60 Minutes (2 Questions Deep Dive)</option>
             </select>
           </div>
         </div>
@@ -150,7 +182,7 @@ export default function CreateInterviewModal({
             ) : (
               <>
                 <Plus className="size-4" />
-                <span>Schedule Interview</span>
+                <span>Schedule Interview ({secondaryProblemTitle ? "2 Questions" : "1 Question"})</span>
               </>
             )}
           </Button>

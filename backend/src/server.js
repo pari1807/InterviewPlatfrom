@@ -40,7 +40,8 @@ app.get("/health", (req, res) => {
 });
 
 // Setup Socket.io real-time engine
-setupInterviewSocket(server);
+const io = setupInterviewSocket(server);
+app.set("io", io);
 
 // Production distribution serving
 if (ENV.NODE_ENV === "production") {
