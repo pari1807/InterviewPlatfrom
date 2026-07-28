@@ -1,40 +1,59 @@
+import React from "react";
 import { useUser } from "@clerk/clerk-react";
-import { ArrowRightIcon, SparklesIcon, ZapIcon } from "lucide-react";
+import { Sparkles, Plus, Play, FileText, ArrowRight } from "lucide-react";
+import { Button } from "./ui/Button";
 
-function WelcomeSection({ onCreateSession }) {
+export default function WelcomeSection({ onCreateSession }) {
   const { user } = useUser();
 
   return (
-    <div className="relative overflow-hidden">
-      <div className="relative max-w-7xl mx-auto px-6 py-16">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                <SparklesIcon className="w-6 h-6 text-white" />
-              </div>
-              <h1 className="text-5xl font-black bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                Welcome back, {user?.firstName || "there"}!
-              </h1>
-            </div>
-            <p className="text-xl text-base-content/60 ml-16">
-              Ready to level up your coding skills?
-            </p>
+    <div className="relative overflow-hidden bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl mb-8">
+      {/* Decorative subtle ambient background shapes */}
+      <div className="absolute -right-16 -top-16 size-64 bg-emerald-500/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute right-32 -bottom-20 size-64 bg-teal-400/20 rounded-full blur-3xl pointer-events-none" />
+
+      <div className="relative z-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+        <div className="space-y-3 max-w-2xl">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-semibold tracking-wide">
+            <Sparkles className="size-3.5 text-emerald-400" />
+            <span>AI Remote Interview Platform</span>
           </div>
-          <button
+
+          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
+            Welcome back,{" "}
+            <span className="bg-gradient-to-r from-emerald-200 to-teal-200 bg-clip-text text-transparent">
+              {user?.firstName || "Candidate"}
+            </span>
+          </h1>
+
+          <p className="text-emerald-100/80 text-sm sm:text-base leading-relaxed">
+            Practice technical interviews with live peer collaboration, AI insights, and real-time code execution.
+          </p>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+          <Button
+            variant="emeraldGradient"
+            size="lg"
             onClick={onCreateSession}
-            className="group px-8 py-4 bg-gradient-to-r from-primary to-secondary rounded-2xl transition-all duration-200 hover:opacity-90"
+            className="w-full sm:w-auto shadow-lg shadow-emerald-950/40"
           >
-            <div className="flex items-center gap-3 text-white font-bold text-lg">
-              <ZapIcon className="w-6 h-6" />
-              <span>Create Session</span>
-              <ArrowRightIcon className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </div>
-          </button>
+            <Plus className="size-5" />
+            <span>Start Interview</span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full sm:w-auto bg-white/10 hover:bg-white/20 text-white border-white/20 hover:border-white/40"
+            onClick={onCreateSession}
+          >
+            <Play className="size-4" />
+            <span>Practice Topic</span>
+          </Button>
         </div>
       </div>
     </div>
   );
 }
-
-export default WelcomeSection;

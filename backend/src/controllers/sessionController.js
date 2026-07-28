@@ -1,5 +1,6 @@
 import { chatClient, streamClient } from "../lib/stream.js";
 import Session from "../models/Session.js";
+import AIEvaluation from "../models/AIEvaluation.js";
 
 export async function createSession(req, res) {
   try {
@@ -65,6 +66,8 @@ export async function getMyRecentSessions(req, res) {
       status: "completed",
       $or: [{ host: userId }, { participant: userId }],
     })
+      .populate("host", "name profileImage email clerkId")
+      .populate("participant", "name profileImage email clerkId")
       .sort({ createdAt: -1 })
       .limit(20);
 
@@ -106,11 +109,17 @@ export async function joinSession(req, res) {
       return res.status(400).json({ message: "Cannot join a completed session" });
     }
 
+    // Host rejoining check
     if (session.host.toString() === userId.toString()) {
-      return res.status(400).json({ message: "Host cannot join their own session as participant" });
+      return res.status(200).json({ session, message: "Host re-joined session" });
     }
 
-    // check if session is already full - has a participant
+    // Participant rejoining check
+    if (session.participant && session.participant.toString() === userId.toString()) {
+      return res.status(200).json({ session, message: "Participant re-joined session" });
+    }
+
+    // Check if session is already full (1 host + 1 candidate)
     if (session.participant) return res.status(409).json({ message: "Session is full" });
 
     session.participant = userId;
@@ -135,23 +144,29 @@ export async function endSession(req, res) {
 
     if (!session) return res.status(404).json({ message: "Session not found" });
 
-    // check if user is the host
+    // Check if user is the host
     if (session.host.toString() !== userId.toString()) {
       return res.status(403).json({ message: "Only the host can end the session" });
     }
 
-    // check if session is already completed
     if (session.status === "completed") {
       return res.status(400).json({ message: "Session is already completed" });
     }
 
-    // delete stream video call
-    const call = streamClient.video.call("default", session.callId);
-    await call.delete({ hard: true });
+    // Delete stream video call & chat channel safely
+    try {
+      const call = streamClient.video.call("default", session.callId);
+      await call.delete({ hard: true });
+    } catch (e) {
+      console.log("Stream video call delete error ignored:", e.message);
+    }
 
-    // delete stream chat channel
-    const channel = chatClient.channel("messaging", session.callId);
-    await channel.delete();
+    try {
+      const channel = chatClient.channel("messaging", session.callId);
+      await channel.delete();
+    } catch (e) {
+      console.log("Stream chat channel delete error ignored:", e.message);
+    }
 
     session.status = "completed";
     await session.save();

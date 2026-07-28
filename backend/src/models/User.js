@@ -20,8 +20,18 @@ const userSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
+    role: {
+      type: String,
+      enum: ["host", "candidate", "pending"],
+      default: "pending",
+    },
+    candidateId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
   },
-  { timestamps: true } // createdAt, updatedAt
+  { timestamps: true }
 );
 
 const User = mongoose.model("User", userSchema);

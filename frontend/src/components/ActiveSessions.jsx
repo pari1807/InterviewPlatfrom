@@ -1,109 +1,113 @@
-import {
-  ArrowRightIcon,
-  Code2Icon,
-  CrownIcon,
-  SparklesIcon,
-  UsersIcon,
-  ZapIcon,
-  LoaderIcon,
-} from "lucide-react";
+import React from "react";
 import { Link } from "react-router";
-import { getDifficultyBadgeClass } from "../lib/utils";
+import { Zap, Code2, Users, Crown, ArrowRight, Loader2, Sparkles } from "lucide-react";
+import { Badge, getDifficultyBadgeVariant } from "./ui/Badge";
+import { Card, CardHeader, CardBody } from "./ui/Card";
+import { Button } from "./ui/Button";
 
-function ActiveSessions({ sessions, isLoading, isUserInSession }) {
+export default function ActiveSessions({ sessions = [], isLoading = false, isUserInSession }) {
   return (
-    <div className="lg:col-span-2 card bg-base-100 border-2 border-primary/20 hover:border-primary/30 h-full">
-      <div className="card-body">
-        {/* HEADERS SECTION */}
-        <div className="flex items-center justify-between mb-6">
-          {/* TITLE AND ICON */}
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-gradient-to-br from-primary to-secondary rounded-xl">
-              <ZapIcon className="size-5" />
-            </div>
-            <h2 className="text-2xl font-black">Live Sessions</h2>
+    <Card className="h-full flex flex-col">
+      <CardHeader className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/60">
+            <Zap className="size-5" />
           </div>
-
-          <div className="flex items-center gap-2">
-            <div className="size-2 bg-success rounded-full" />
-            <span className="text-sm font-medium text-success">{sessions.length} active</span>
+          <div>
+            <h2 className="text-lg font-bold text-slate-900">Live Active Rooms</h2>
+            <p className="text-xs text-slate-500">Real-time collaborative candidate sessions</p>
           </div>
         </div>
 
-        {/* SESSIONS LIST */}
-        <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-20">
-              <LoaderIcon className="size-10 animate-spin text-primary" />
-            </div>
-          ) : sessions.length > 0 ? (
-            sessions.map((session) => (
+        <div className="flex items-center gap-2">
+          <span className="relative flex size-2.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+            <span className="relative inline-flex rounded-full size-2.5 bg-emerald-500" />
+          </span>
+          <span className="text-xs font-semibold text-emerald-700">{sessions.length} Active</span>
+        </div>
+      </CardHeader>
+
+      <CardBody className="flex-1 overflow-y-auto max-h-[380px] p-4 space-y-3">
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-16 text-slate-400">
+            <Loader2 className="size-8 animate-spin text-emerald-600 mb-2" />
+            <p className="text-xs">Fetching active rooms...</p>
+          </div>
+        ) : sessions.length > 0 ? (
+          sessions.map((session) => {
+            const inSession = isUserInSession ? isUserInSession(session) : false;
+            const isFull = session.participant && !inSession;
+
+            return (
               <div
                 key={session._id}
-                className="card bg-base-200 border-2 border-base-300 hover:border-primary/50"
+                className="p-4 rounded-xl bg-slate-50/70 border border-slate-200/70 hover:border-emerald-300 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
               >
-                <div className="flex items-center justify-between gap-4 p-5">
-                  {/* LEFT SIDE */}
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="relative size-14 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center">
-                      <Code2Icon className="size-7 text-white" />
-                      <div className="absolute -top-1 -right-1 size-4 bg-success rounded-full border-2 border-base-100" />
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-bold text-lg truncate">{session.problem}</h3>
-                        <span
-                          className={`badge badge-sm ${getDifficultyBadgeClass(
-                            session.difficulty
-                          )}`}
-                        >
-                          {session.difficulty.slice(0, 1).toUpperCase() +
-                            session.difficulty.slice(1)}
-                        </span>
-                      </div>
-
-                      <div className="flex items-center gap-4 text-sm opacity-80">
-                        <div className="flex items-center gap-1.5">
-                          <CrownIcon className="size-4" />
-                          <span className="font-medium">{session.host?.name}</span>
-                        </div>
-                        <div className="flex items-center gap-1.5">
-                          <UsersIcon className="size-4" />
-                          <span className="text-xs">{session.participant ? "2/2" : "1/2"}</span>
-                        </div>
-                        {session.participant && !isUserInSession(session) ? (
-                          <span className="badge badge-error badge-sm">FULL</span>
-                        ) : (
-                          <span className="badge badge-success badge-sm">OPEN</span>
-                        )}
-                      </div>
-                    </div>
+                <div className="flex items-start gap-3 flex-1 min-w-0">
+                  <div className="size-11 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white font-bold text-sm shrink-0 shadow-sm">
+                    <Code2 className="size-5" />
                   </div>
 
-                  {session.participant && !isUserInSession(session) ? (
-                    <button className="btn btn-disabled btn-sm">Full</button>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1 flex-wrap">
+                      <h3 className="font-semibold text-slate-900 text-sm truncate">
+                        {session.problem}
+                      </h3>
+                      <Badge variant={getDifficultyBadgeVariant(session.difficulty)}>
+                        {session.difficulty}
+                      </Badge>
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs text-slate-500">
+                      <span className="flex items-center gap-1">
+                        <Crown className="size-3.5 text-amber-500" />
+                        <span className="font-medium text-slate-700">{session.host?.name || "Host"}</span>
+                      </span>
+                      <span className="flex items-center gap-1">
+                        <Users className="size-3.5 text-slate-400" />
+                        <span>{session.participant ? "2/2 Participants" : "1/2 Participants"}</span>
+                      </span>
+                      {isFull ? (
+                        <Badge variant="error" size="sm">
+                          FULL
+                        </Badge>
+                      ) : (
+                        <Badge variant="emerald" size="sm">
+                          OPEN
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="w-full sm:w-auto shrink-0">
+                  {isFull ? (
+                    <Button variant="ghost" size="sm" disabled className="w-full sm:w-auto">
+                      Full
+                    </Button>
                   ) : (
-                    <Link to={`/session/${session._id}`} className="btn btn-primary btn-sm gap-2">
-                      {isUserInSession(session) ? "Rejoin" : "Join"}
-                      <ArrowRightIcon className="size-4" />
+                    <Link to={`/session/${session._id}`} className="block">
+                      <Button variant="primary" size="sm" className="w-full sm:w-auto">
+                        <span>{inSession ? "Rejoin" : "Join Session"}</span>
+                        <ArrowRight className="size-3.5" />
+                      </Button>
                     </Link>
                   )}
                 </div>
               </div>
-            ))
-          ) : (
-            <div className="text-center py-16">
-              <div className="w-20 h-20 mx-auto mb-4 bg-gradient-to-br from-primary/20 to-secondary/20 rounded-3xl flex items-center justify-center">
-                <SparklesIcon className="w-10 h-10 text-primary/50" />
-              </div>
-              <p className="text-lg font-semibold opacity-70 mb-1">No active sessions</p>
-              <p className="text-sm opacity-50">Be the first to create one!</p>
+            );
+          })
+        ) : (
+          <div className="text-center py-12 px-4">
+            <div className="size-14 mx-auto mb-3 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center border border-emerald-100">
+              <Sparkles className="size-6" />
             </div>
-          )}
-        </div>
-      </div>
-    </div>
+            <p className="text-sm font-bold text-slate-800">No active interview rooms</p>
+            <p className="text-xs text-slate-500 mt-1">Be the first candidate to host a live room!</p>
+          </div>
+        )}
+      </CardBody>
+    </Card>
   );
 }
-export default ActiveSessions;

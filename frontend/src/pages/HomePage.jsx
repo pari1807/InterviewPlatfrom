@@ -1,182 +1,181 @@
+import React from "react";
 import { Link } from "react-router";
-import {
-  ArrowRightIcon,
-  CheckIcon,
-  Code2Icon,
-  SparklesIcon,
-  UsersIcon,
-  VideoIcon,
-  ZapIcon,
-} from "lucide-react";
 import { SignInButton } from "@clerk/clerk-react";
+import {
+  Sparkles,
+  ArrowRight,
+  Video,
+  Code2,
+  Users,
+  CheckCircle2,
+  Zap,
+  ShieldCheck,
+  Award,
+} from "lucide-react";
+import { Button } from "../components/ui/Button";
+import { Badge } from "../components/ui/Badge";
+import { Card } from "../components/ui/Card";
 
-function HomePage() {
+export default function HomePage() {
   return (
-    <div className="bg-gradient-to-br from-base-100 via-base-200 to-base-300">
-      {/* NAVBAR */}
-      <nav className="bg-base-100/80 backdrop-blur-md border-b border-primary/20 sticky top-0 z-50 shadow-lg">
-        <div className="max-w-7xl mx-auto p-4 flex items-center justify-between">
-          {/* LOGO */}
-          <Link
-            to={"/"}
-            className="flex items-center gap-3 hover:scale-105 transition-transform duration-200"
-          >
-            <div className="size-10 rounded-xl bg-gradient-to-br from-primary via-secondary to-accent flex items-center justify-center shadow-lg">
-              <SparklesIcon className="size-6 text-white" />
+    <div className="min-h-screen bg-slate-50 text-slate-900 selection:bg-emerald-500 selection:text-white">
+      {/* Navigation Bar */}
+      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-6 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2.5 group">
+            <div className="size-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
+              <Sparkles className="size-5" />
             </div>
-
             <div className="flex flex-col">
-              <span className="font-black text-xl bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent font-mono tracking-wider">
-                Talent IQ
+              <span className="font-bold text-xl text-slate-900 tracking-tight flex items-center gap-1">
+                Talent <span className="text-emerald-600 font-extrabold">IQ</span>
               </span>
-              <span className="text-xs text-base-content/60 font-medium -mt-1">Code Together</span>
+              <span className="text-xs text-emerald-700 font-medium -mt-1">
+                Remote Interview SaaS
+              </span>
             </div>
           </Link>
 
-          {/* AUTH BTN */}
           <SignInButton mode="modal">
-            <button className="group px-6 py-3 bg-gradient-to-r from-primary to-secondary rounded-xl text-white font-semibold text-sm shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105 flex items-center gap-2">
+            <Button variant="emeraldGradient" size="md">
               <span>Get Started</span>
-              <ArrowRightIcon className="size-4 group-hover:translate-x-0.5 transition-transform" />
-            </button>
+              <ArrowRight className="size-4" />
+            </Button>
           </SignInButton>
         </div>
       </nav>
 
-      {/* HERO SECTION */}
-      <div className="max-w-7xl mx-auto px-4 py-20">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          {/* LEFT CONTENT */}
-          <div className="space-y-8">
-            <div className="badge badge-primary badge-lg">
-              <ZapIcon className="size-4" />
-              Real-time Collaboration
-            </div>
+      {/* Hero Section */}
+      <section className="relative overflow-hidden pt-20 pb-16 px-6">
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 size-96 bg-emerald-300/20 rounded-full blur-3xl pointer-events-none" />
 
-            <h1 className="text-5xl lg:text-7xl font-black leading-tight">
-              <span className="bg-gradient-to-r from-primary via-secondary to-accent bg-clip-text text-transparent">
-                Code Together,
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
+          <div className="space-y-6 text-center lg:text-left">
+            <Badge variant="emerald" size="lg" className="inline-flex">
+              <Zap className="size-4 text-emerald-600" />
+              <span>Real-time Pair Programming & AI Coaching</span>
+            </Badge>
+
+            <h1 className="text-4xl sm:text-6xl font-extrabold tracking-tight text-slate-900 leading-[1.15]">
+              Master Technical <br className="hidden sm:inline" />
+              <span className="bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 bg-clip-text text-transparent">
+                Remote Interviews
               </span>
-              <br />
-              <span className="text-base-content">Learn Together</span>
             </h1>
 
-            <p className="text-xl text-base-content/70 leading-relaxed max-w-xl">
-              The ultimate platform for collaborative coding interviews and pair programming.
-              Connect face-to-face, code in real-time, and ace your technical interviews.
+            <p className="text-lg text-slate-600 max-w-xl mx-auto lg:mx-0 leading-relaxed">
+              The premier platform for collaborative coding interviews. Practice live video pair programming with peers, receive AI analytics, and ace technical screens.
             </p>
 
-            {/* FEATURE PILLS */}
-            <div className="flex flex-wrap gap-3">
-              <div className="badge badge-lg badge-outline">
-                <CheckIcon className="size-4 text-success" />
-                Live Video Chat
-              </div>
-              <div className="badge badge-lg badge-outline">
-                <CheckIcon className="size-4 text-success" />
-                Code Editor
-              </div>
-              <div className="badge badge-lg badge-outline">
-                <CheckIcon className="size-4 text-success" />
-                Multi-Language
-              </div>
-            </div>
-
-            {/* CTA Buttons */}
-            <div className="flex flex-wrap gap-4">
+            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-2">
               <SignInButton mode="modal">
-                <button className="btn btn-primary btn-lg">
-                  Start Coding Now
-                  <ArrowRightIcon className="size-5" />
-                </button>
+                <Button variant="emeraldGradient" size="lg">
+                  <span>Start Free Trial</span>
+                  <ArrowRight className="size-5" />
+                </Button>
               </SignInButton>
 
-              <button className="btn btn-outline btn-lg">
-                <VideoIcon className="size-5" />
-                Watch Demo
-              </button>
+              <SignInButton mode="modal">
+                <Button variant="outline" size="lg">
+                  <Video className="size-5 text-emerald-600" />
+                  <span>Watch Platform Demo</span>
+                </Button>
+              </SignInButton>
             </div>
 
-            {/* STATS */}
-            <div className="stats stats-vertical lg:stats-horizontal bg-base-100 shadow-lg">
-              <div className="stat">
-                <div className="stat-value text-primary">10K+</div>
-                <div className="stat-title">Active Users</div>
-              </div>
-              <div className="stat">
-                <div className="stat-value text-secondary">50K+</div>
-                <div className="stat-title">Sessions</div>
-              </div>
-              <div className="stat">
-                <div className="stat-value text-accent">99.9%</div>
-                <div className="stat-title">Uptime</div>
-              </div>
+            {/* Feature Checkmarks */}
+            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-6 pt-4 text-xs font-semibold text-slate-600">
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="size-4 text-emerald-600" /> Live HD Video & Chat
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="size-4 text-emerald-600" /> Monaco Code Editor
+              </span>
+              <span className="flex items-center gap-1.5">
+                <CheckCircle2 className="size-4 text-emerald-600" /> Multi-Language Sandbox
+              </span>
             </div>
           </div>
 
-          {/* RIGHT IMAGE */}
-          <img
-            src="/hero.png"
-            alt="CodeCollab Platform"
-            className="w-full h-auto rounded-3xl shadow-2xl border-4 border-base-100 hover:scale-105 transition-transform duration-500"
-          />
+          {/* Right Image Display */}
+          <div className="relative">
+            <div className="p-2 rounded-3xl bg-gradient-to-b from-slate-200 to-emerald-100 shadow-2xl border border-slate-200">
+              <img
+                src="/hero.png"
+                alt="TalentIQ Interview Platform"
+                className="rounded-2xl w-full h-auto object-cover border border-white"
+              />
+            </div>
+          </div>
         </div>
-      </div>
+      </section>
 
-      {/* FEATURES SECTION */}
-      <div className="max-w-7xl mx-auto px-4 py-20">
-        <div className="text-center mb-16">
-          <h2 className="text-4xl font-bold mb-4">
-            Everything You Need to <span className="text-primary font-mono">Succeed</span>
+      {/* Metrics Banner */}
+      <section className="py-12 bg-white border-y border-slate-200/80">
+        <div className="max-w-7xl mx-auto px-6 grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+          <div>
+            <p className="text-3xl sm:text-4xl font-extrabold text-emerald-600">10,000+</p>
+            <p className="text-xs font-medium text-slate-500 mt-1">Active Candidates</p>
+          </div>
+          <div>
+            <p className="text-3xl sm:text-4xl font-extrabold text-emerald-600">50,000+</p>
+            <p className="text-xs font-medium text-slate-500 mt-1">Mock Interviews Conducted</p>
+          </div>
+          <div>
+            <p className="text-3xl sm:text-4xl font-extrabold text-emerald-600">99.9%</p>
+            <p className="text-xs font-medium text-slate-500 mt-1">System Uptime</p>
+          </div>
+          <div>
+            <p className="text-3xl sm:text-4xl font-extrabold text-emerald-600">94%</p>
+            <p className="text-xs font-medium text-slate-500 mt-1">FAANG Pass Rate</p>
+          </div>
+        </div>
+      </section>
+
+      {/* Features Grid */}
+      <section className="py-20 px-6 max-w-7xl mx-auto">
+        <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
+          <Badge variant="emerald">Platform Capabilities</Badge>
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-slate-900">
+            Everything You Need to Ace Coding Screens
           </h2>
-          <p className="text-lg text-base-content/70 max-w-2xl mx-auto">
-            Powerful features designed to make your coding interviews seamless and productive
+          <p className="text-slate-600 text-sm">
+            Purpose-built tools for realistic technical interview preparation.
           </p>
         </div>
 
-        {/* FEATURES GRID */}
         <div className="grid md:grid-cols-3 gap-8">
-          {/* Feature 1 */}
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body items-center text-center">
-              <div className="size-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
-                <VideoIcon className="size-8 text-primary" />
-              </div>
-              <h3 className="card-title">HD Video Call</h3>
-              <p className="text-base-content/70">
-                Crystal clear video and audio for seamless communication during interviews
-              </p>
+          <Card className="p-8 text-center">
+            <div className="size-14 mx-auto mb-6 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center">
+              <Video className="size-7" />
             </div>
-          </div>
+            <h3 className="font-bold text-slate-900 text-lg mb-2">HD Video & Audio Call</h3>
+            <p className="text-slate-600 text-xs leading-relaxed">
+              Crystal clear video streaming powered by Stream SDK for natural candidate communication.
+            </p>
+          </Card>
 
-          {/* Feature 2 */}
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body items-center text-center">
-              <div className="size-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
-                <Code2Icon className="size-8 text-primary" />
-              </div>
-              <h3 className="card-title">Live Code Editor</h3>
-              <p className="text-base-content/70">
-                Collaborate in real-time with syntax highlighting and multiple language support
-              </p>
+          <Card className="p-8 text-center">
+            <div className="size-14 mx-auto mb-6 rounded-2xl bg-teal-50 text-teal-600 border border-teal-200/60 flex items-center justify-center">
+              <Code2 className="size-7" />
             </div>
-          </div>
+            <h3 className="font-bold text-slate-900 text-lg mb-2">Monaco Code Editor</h3>
+            <p className="text-slate-600 text-xs leading-relaxed">
+              Real-time pair programming code editor with syntax highlighting and instant compilation via Piston.
+            </p>
+          </Card>
 
-          {/* Feature 3 */}
-          <div className="card bg-base-100 shadow-xl">
-            <div className="card-body items-center text-center">
-              <div className="size-16 bg-primary/10 rounded-2xl flex items-center justify-center mb-4">
-                <UsersIcon className="size-8 text-primary" />
-              </div>
-              <h3 className="card-title">Easy Collaboration</h3>
-              <p className="text-base-content/70">
-                Share your screen, discuss solutions, and learn from each other in real-time
-              </p>
+          <Card className="p-8 text-center">
+            <div className="size-14 mx-auto mb-6 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center">
+              <Users className="size-7" />
             </div>
-          </div>
+            <h3 className="font-bold text-slate-900 text-lg mb-2">Peer Collaboration</h3>
+            <p className="text-slate-600 text-xs leading-relaxed">
+              Instant 1-on-1 interview creation with open room invitations and interactive text chat.
+            </p>
+          </Card>
         </div>
-      </div>
+      </section>
     </div>
   );
 }
-export default HomePage;

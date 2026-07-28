@@ -2,6 +2,11 @@ import mongoose from "mongoose";
 
 const sessionSchema = new mongoose.Schema(
   {
+    interviewId: {
+      type: String,
+      unique: true,
+      sparse: true,
+    },
     problem: {
       type: String,
       required: true,
@@ -21,15 +26,34 @@ const sessionSchema = new mongoose.Schema(
       ref: "User",
       default: null,
     },
+    candidateId: {
+      type: String,
+      default: "",
+    },
     status: {
       type: String,
-      enum: ["active", "completed"],
+      enum: ["scheduled", "active", "completed", "cancelled"],
       default: "active",
     },
-    // stream video call ID
     callId: {
       type: String,
       default: "",
+    },
+    scheduledAt: {
+      type: Date,
+      default: Date.now,
+    },
+    durationMinutes: {
+      type: Number,
+      default: 45,
+    },
+    hostNotes: {
+      type: String,
+      default: "",
+    },
+    rubric: {
+      type: Object,
+      default: null,
     },
   },
   { timestamps: true }
