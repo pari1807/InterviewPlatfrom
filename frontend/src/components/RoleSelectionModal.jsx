@@ -14,10 +14,16 @@ export default function RoleSelectionModal({ isOpen, onRoleSelected, userCandida
     setIsSubmitting(true);
     try {
       const res = await axios.post("/users/set-role", { role: selectedRole });
-      toast.success(`Registered as ${selectedRole.toUpperCase()}!`);
-      if (onRoleSelected) onRoleSelected(res.data.user);
+      if (res.data?.user) {
+        toast.success(`Welcome! Registered as ${selectedRole === "host" ? "Host" : "Candidate"} successfully.`);
+        if (onRoleSelected) onRoleSelected(res.data.user);
+      } else {
+        throw new Error("Server did not return updated user");
+      }
     } catch (err) {
-      toast.error("Failed to save application role");
+      const msg = err.response?.data?.message || err.message || "Failed to save role. Please try again.";
+      console.error("[RoleModal] set-role failed:", msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }

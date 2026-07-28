@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { useUser as useClerkUser, useAuth } from "@clerk/clerk-react";
 import axios, { setClerkToken } from "../lib/axios";
 
@@ -9,56 +9,88 @@ export function UserProvider({ children }) {
   const { getToken } = useAuth();
   const [dbUser, setDbUser] = useState(null);
   const [loadingDbUser, setLoadingDbUser] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
 
-  const fetchDbUser = async () => {
+  /**
+   * Fetch and inject Clerk token, then load the MongoDB user profile.
+   * This is the single source of truth for all auth state.
+   */
+  const fetchDbUser = useCallback(async () => {
     if (!clerkUser) {
       setDbUser(null);
       setLoadingDbUser(false);
       return;
     }
 
-    try {
-      // Securely fetch Clerk JWT and attach to all subsequent axios requests
-      const token = await getToken();
-      if (token) {
-        setClerkToken(token);
-      }
+    setLoadingDbUser(true);
+    setFetchError(null);
 
+    try {
+      // 1. Get the Clerk JWT token
+      const token = await getToken();
+      
+      // 2. Inject token AND user details into axios interceptor
+      setClerkToken(token || "session_token", {
+        id: clerkUser.id,
+        name: clerkUser.fullName || clerkUser.username || "Candidate User",
+        email: clerkUser.primaryEmailAddress?.emailAddress || `${clerkUser.id}@clerk.user`,
+        imageUrl: clerkUser.imageUrl || "",
+      });
+
+      // 3. Load the MongoDB user profile
       const res = await axios.get("/users/me");
       if (res.data?.user) {
         setDbUser(res.data.user);
+      } else {
+        throw new Error("Server returned no user data");
       }
     } catch (err) {
-      console.log("UserContext error fetching /users/me:", err.message);
+      console.error("[UserContext] fetchDbUser failed:", err.message);
+      setFetchError(err.message);
     } finally {
       setLoadingDbUser(false);
     }
-  };
+  }, [clerkUser, getToken]);
 
+  // Run on initial load and whenever the signed-in user changes
   useEffect(() => {
     if (clerkLoaded) {
       fetchDbUser();
     }
-  }, [clerkUser?.id, clerkLoaded]);
+  }, [clerkLoaded, fetchDbUser]);
 
-  // Provide a reliable way for other hooks (like useCreateSession) to ensure headers exist
+  // Refresh Clerk token every 55 minutes
   useEffect(() => {
-    const attachToken = async () => {
-      if (clerkUser) {
+    if (!clerkUser) return;
+
+    const refreshInterval = setInterval(async () => {
+      try {
         const token = await getToken();
         if (token) {
-          setClerkToken(token);
+          setClerkToken(token, {
+            id: clerkUser.id,
+            name: clerkUser.fullName || clerkUser.username || "Candidate User",
+            email: clerkUser.primaryEmailAddress?.emailAddress || `${clerkUser.id}@clerk.user`,
+            imageUrl: clerkUser.imageUrl || "",
+          });
         }
+      } catch (e) {
+        console.warn("[UserContext] Token refresh failed:", e.message);
       }
-    };
-    attachToken();
-  }, [clerkUser?.id]);
+    }, 55 * 60 * 1000);
+
+    return () => clearInterval(refreshInterval);
+  }, [clerkUser, getToken]);
 
   const value = {
     dbUser,
     loadingDbUser,
+    fetchError,
     refetchUser: fetchDbUser,
     setDbUser,
+    isHost: dbUser?.role === "host",
+    isCandidate: dbUser?.role === "candidate",
+    isPending: dbUser?.role === "pending" || (!loadingDbUser && !dbUser),
     candidateKey: dbUser?.candidateKey || dbUser?.candidateId || "",
   };
 

@@ -333,12 +333,23 @@ function SessionPageInner({ session, isHost, isParticipant, id, chatClient, chan
       setLiveAIData(analysis);
     });
 
+    // Real-time interview session completion listener for Candidate & Host
+    socket.on("interview_status", ({ status }) => {
+      if (status === "completed") {
+        toast.success("Interview session has been completed! Redirecting to Dashboard...");
+        setTimeout(() => {
+          navigate("/dashboard", { replace: true });
+        }, 1200);
+      }
+    });
+
     return () => {
       socket.off("code_sync");
       socket.off("question_switched");
       socket.off("live_ai_analysis_update");
+      socket.off("interview_status");
     };
-  }, [id, user, isHost]);
+  }, [id, user, isHost, navigate]);
 
   // Update starter code when active question or language changes
   useEffect(() => {
@@ -355,8 +366,10 @@ function SessionPageInner({ session, isHost, isParticipant, id, chatClient, chan
 
   // Redirect on completion
   useEffect(() => {
-    if (session?.status === "completed") navigate("/dashboard");
-  }, [session?.status]);
+    if (session?.status === "completed") {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [session?.status, navigate]);
 
   const handleSwitchQuestion = (idx) => {
     setActiveQuestionIndex(idx);
@@ -415,7 +428,14 @@ function SessionPageInner({ session, isHost, isParticipant, id, chatClient, chan
 
   const handleEndSession = () => {
     if (confirm("End this interview session? Both participants will be disconnected.")) {
-      endSessionMutation.mutate(id, { onSuccess: () => navigate("/dashboard") });
+      const socket = getSocket();
+      socket.emit("interview_ended", { roomId: id });
+      endSessionMutation.mutate(id, {
+        onSuccess: () => {
+          toast.success("Interview ended successfully.");
+          navigate("/dashboard", { replace: true });
+        },
+      });
     }
   };
 

@@ -1,5 +1,7 @@
+import { clerkClient } from "@clerk/express";
 import User from "../models/User.js";
 import Activity from "../models/Activity.js";
+import { syncOrCreateUser } from "../services/userService.js";
 
 export async function getCurrentUser(req, res) {
   try {
@@ -75,7 +77,26 @@ export async function getAllCandidates(req, res) {
       });
     }
 
-    const { search = "", page = 1, limit = 50 } = req.query;
+    // Auto-sync: Fetch all Clerk users and ensure every account is onboarded in MongoDB
+    try {
+      const clerkUsersList = await clerkClient.users.getUserList({ limit: 100 });
+      const clerkUsers = clerkUsersList?.data || clerkUsersList || [];
+
+      for (const cu of clerkUsers) {
+        if (!cu?.id) continue;
+        const existing = await User.findOne({ clerkId: cu.id });
+        if (!existing) {
+          const name = `${cu.firstName || ""} ${cu.lastName || ""}`.trim() || cu.username || "Candidate User";
+          const email = cu.emailAddresses?.[0]?.emailAddress || `${cu.id}@clerk.user`;
+          const profileImage = cu.imageUrl || "";
+          await syncOrCreateUser(cu.id, { name, email, profileImage });
+        }
+      }
+    } catch (syncErr) {
+      console.warn("Auto-sync Clerk users warning:", syncErr.message);
+    }
+
+    const { search = "", page = 1, limit = 100 } = req.query;
     const currentUserId = req.user._id;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
@@ -91,6 +112,7 @@ export async function getAllCandidates(req, res) {
         { email: regex },
         { candidateId: regex },
         { candidateKey: regex },
+        { clerkId: regex },
       ];
     }
 

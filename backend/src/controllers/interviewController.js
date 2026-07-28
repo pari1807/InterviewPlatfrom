@@ -14,6 +14,11 @@ export async function createInterviewByCandidateId(req, res) {
     const { candidateId, problem, difficulty, secondaryProblem, secondaryDifficulty, durationMinutes } = req.body;
     const hostUser = req.user;
 
+    // Security check: only hosts can create live meetings!
+    if (hostUser.role !== "host") {
+      return res.status(403).json({ message: "Forbidden: Only users with the Host role can create live meetings." });
+    }
+
     if (!candidateId || !problem || !difficulty) {
       return res.status(400).json({ message: "Candidate Key/Email, primary problem, and difficulty are required." });
     }
@@ -58,67 +63,112 @@ export async function createInterviewByCandidateId(req, res) {
       await streamClient.video.call("default", callId).getOrCreate({
         data: {
           created_by_id: hostUser.clerkId,
-          custom: { problem, difficulty, sessionId: session._id.toString() },
+          members: [
+            { user_id: hostUser.clerkId, role: "call_member" },
+            { user_id: candidateUser.clerkId, role: "call_member" },
+          ],
         },
       });
+    } catch (streamErr) {
+      console.error("Stream Video Call Creation Error:", streamErr);
+    }
 
-      // Create Stream Messaging Channel
+    // 5. Create Stream Chat Channel
+    try {
       const channel = chatClient.channel("messaging", callId, {
-        name: `${problem} Session`,
         created_by_id: hostUser.clerkId,
         members: [hostUser.clerkId, candidateUser.clerkId],
+        name: `Interview: ${interviewId}`,
       });
       await channel.create();
-    } catch (e) {
-      console.log("Stream creation non-fatal error:", e.message);
+    } catch (chatErr) {
+      console.error("Stream Chat Creation Error:", chatErr);
     }
 
-    // 5. Create MongoDB Notification for Candidate
-    const problemText = secondaryProblem ? `"${problem}" & "${secondaryProblem}"` : `"${problem}"`;
-    let notification = await Notification.create({
-      recipient: candidateUser._id,
-      sender: hostUser._id,
-      interview: session._id,
-      title: "New Technical Interview Invitation",
-      message: `${hostUser.name} invited you to a live ${difficulty.toUpperCase()} technical interview featuring ${problemText}.`,
-      type: "invitation",
-    });
-
-    notification = await Notification.findById(notification._id)
-      .populate("sender", "name profileImage email candidateId candidateKey")
-      .populate("interview");
-
-    // 6. Broadcast live socket notification to Candidate
+    // 6. Notify Candidate
     try {
+      await Notification.create({
+        recipient: candidateUser._id,
+        sender: hostUser._id,
+        title: "New Interview Invitation",
+        message: `${hostUser.name} has scheduled a ${difficulty} live interview with you.`,
+        type: "invitation",
+        interview: session._id,
+      });
+
       const io = req.app.get("io");
       if (io) {
-        io.to(`user_${candidateUser.clerkId}`).emit("new_notification", notification);
-        io.to(`user_${candidateUser._id.toString()}`).emit("new_notification", notification);
+        io.to(`user_${candidateUser.clerkId}`).emit("new_notification", {
+          title: "New Interview Invitation",
+          message: `${hostUser.name} has scheduled a ${difficulty} live interview with you.`,
+          sessionId: session._id,
+        });
       }
-    } catch (socketErr) {
-      console.log("Socket notification broadcast non-fatal error:", socketErr.message);
+    } catch (notifyErr) {
+      console.error("Notification Creation Error:", notifyErr);
     }
 
-    // 7. Log Activity in MongoDB
-    await Activity.create({
-      userId: hostUser._id,
-      action: "INTERVIEW_CREATED",
-      details: `Created interview ${interviewId} with candidate ${candidateUser.candidateKey || candidateUser.candidateId} for problems ${problemText}`,
-      metadata: { sessionId: session._id },
-    });
+    // 7. Log Activity
+    try {
+      await Activity.create({
+        userId: hostUser._id,
+        action: "SESSION_CREATED",
+        details: `Scheduled interview ${interviewId} for candidate ${candidateUser.name}`,
+      });
+    } catch (actErr) {
+      console.error("Activity Logging Error:", actErr);
+    }
 
     res.status(201).json({
+      message: "Interview created successfully",
       session,
-      notification,
-      candidate: {
-        name: candidateUser.name,
-        email: candidateUser.email,
-        candidateId: candidateUser.candidateKey || candidateUser.candidateId,
-      },
-      message: `Interview created and notification sent to ${candidateUser.name}`,
+      callId,
+      interviewId,
     });
   } catch (error) {
-    console.error("createInterviewByCandidateId error:", error.message);
+    console.error("createInterviewByCandidateId error:", error);
+    res.status(500).json({ message: "Failed to create interview" });
+  }
+}
+
+export async function getSession(req, res) {
+  try {
+    const { id } = req.params;
+    const session = await Session.findById(id).populate("host participant", "name email profileImage clerkId candidateId role");
+
+    if (!session) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    res.status(200).json({ session });
+  } catch (error) {
+    console.error("getSession error:", error);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+export async function endSession(req, res) {
+  try {
+    const { id } = req.params;
+    const session = await Session.findById(id);
+
+    if (!session) {
+      return res.status(404).json({ message: "Session not found" });
+    }
+
+    session.status = "completed";
+    session.completedAt = new Date();
+    await session.save();
+
+    await Activity.create({
+      userId: req.user._id,
+      action: "SESSION_ENDED",
+      details: `Ended interview session ${session.interviewId}`,
+    });
+
+    res.status(200).json({ message: "Session ended successfully", session });
+  } catch (error) {
+    console.error("endSession error:", error);
     res.status(500).json({ message: "Internal Server Error" });
   }
 }
@@ -126,33 +176,25 @@ export async function createInterviewByCandidateId(req, res) {
 export async function getCandidateInterviews(req, res) {
   try {
     const candidateId = req.user._id;
-
-    const sessions = await Session.find({
-      $or: [{ participant: candidateId }, { host: candidateId }],
-    })
-      .populate("host", "name profileImage email clerkId candidateId candidateKey")
-      .populate("participant", "name profileImage email clerkId candidateId candidateKey")
+    const interviews = await Session.find({ participant: candidateId })
+      .populate("host", "name email profileImage clerkId candidateId role")
       .sort({ createdAt: -1 });
-
-    res.status(200).json({ sessions });
+    res.status(200).json({ interviews });
   } catch (error) {
-    console.error("getCandidateInterviews error:", error.message);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("getCandidateInterviews error:", error);
+    res.status(500).json({ message: "Failed to fetch interviews" });
   }
 }
 
 export async function getHostInterviews(req, res) {
   try {
     const hostId = req.user._id;
-
-    const sessions = await Session.find({ host: hostId })
-      .populate("host", "name profileImage email clerkId candidateId candidateKey")
-      .populate("participant", "name profileImage email clerkId candidateId candidateKey")
+    const interviews = await Session.find({ host: hostId })
+      .populate("participant", "name email profileImage clerkId candidateId role")
       .sort({ createdAt: -1 });
-
-    res.status(200).json({ sessions });
+    res.status(200).json({ interviews });
   } catch (error) {
-    console.error("getHostInterviews error:", error.message);
-    res.status(500).json({ message: "Internal Server Error" });
+    console.error("getHostInterviews error:", error);
+    res.status(500).json({ message: "Failed to fetch interviews" });
   }
 }

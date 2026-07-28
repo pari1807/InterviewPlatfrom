@@ -1,6 +1,7 @@
 import React from "react";
 import { Link, useLocation } from "react-router";
 import { useUser } from "@clerk/clerk-react";
+import { useDbUser } from "../../context/UserContext";
 import {
   LayoutDashboard,
   Crown,
@@ -17,17 +18,29 @@ import {
 export function Sidebar({ isOpen, onClose }) {
   const location = useLocation();
   const { user } = useUser();
+  const { dbUser } = useDbUser();
+
+  const userRole = dbUser?.role;
 
   const isActive = (path) => {
-    if (path === "/dashboard" && location.pathname === "/dashboard") return true;
-    if (path !== "/dashboard" && location.pathname.startsWith(path)) return true;
+    if (location.pathname === path) return true;
+    if (path === "/dashboard" && (location.pathname === "/host-dashboard" || location.pathname === "/candidate-dashboard")) return true;
+    if (path === "/host-dashboard" && location.pathname === "/dashboard") return true;
+    if (path === "/candidate-dashboard" && location.pathname === "/dashboard") return true;
+    if (path !== "/dashboard" && path !== "/host-dashboard" && path !== "/candidate-dashboard" && location.pathname.startsWith(path)) return true;
     return false;
   };
 
+  // Dynamically tailor the top dashboard link based on the user's role
+  const mainDashboardItem =
+    userRole === "host"
+      ? { label: "Host Dashboard", icon: Crown, path: "/host-dashboard" }
+      : userRole === "candidate"
+      ? { label: "Candidate Dashboard", icon: UserCheck, path: "/candidate-dashboard" }
+      : { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" };
+
   const navItems = [
-    { label: "Dashboard", icon: LayoutDashboard, path: "/dashboard" },
-    { label: "Host Dashboard", icon: Crown, path: "/host-dashboard" },
-    { label: "Candidate Analytics", icon: UserCheck, path: "/candidate-dashboard" },
+    mainDashboardItem,
     { label: "Interview Practice", icon: Code2, path: "/problems" },
     { label: "Previous Interviews", icon: History, path: "/history" },
     { label: "Performance Analytics", icon: BarChart3, path: "/analytics" },
@@ -120,9 +133,11 @@ export function Sidebar({ isOpen, onClose }) {
             )}
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-slate-900 truncate">
-                {user?.fullName || user?.firstName || "Candidate"}
+                {user?.fullName || user?.firstName || (userRole === "host" ? "Host" : "Candidate")}
               </p>
-              <p className="text-[11px] text-emerald-600 font-medium truncate">PRO Member</p>
+              <p className="text-[11px] text-emerald-600 font-medium truncate capitalize">
+                {userRole ? `${userRole} Account` : "PRO Member"}
+              </p>
             </div>
           </div>
         </div>

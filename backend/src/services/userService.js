@@ -5,8 +5,8 @@ import Activity from "../models/Activity.js";
 import { upsertStreamUser } from "../lib/stream.js";
 
 /**
- * Generates a guaranteed unique Candidate Key (e.g. CAND-8F4A2D)
- * Checks MongoDB in a while loop to prevent any duplicate key collision.
+ * Generates a guaranteed unique Candidate Key (e.g. CAND-8F4A2D).
+ * Checks MongoDB in a while-loop to prevent any duplicate key collision.
  */
 export async function generateUniqueCandidateKey() {
   const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -19,162 +19,216 @@ export async function generateUniqueCandidateKey() {
       randomPart += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     candidateKey = `CAND-${randomPart}`;
-
     const existing = await User.findOne({
       $or: [{ candidateId: candidateKey }, { candidateKey: candidateKey }],
     });
-
-    if (!existing) {
-      isUnique = true;
-    }
+    if (!existing) isUnique = true;
   }
 
   return candidateKey;
 }
 
 /**
- * Centralized User Onboarding & Synchronization
- * Ensures every Clerk user has a complete MongoDB document, Role, Candidate Key, and real Clerk Profile.
+ * Fetch real user details from the Clerk Management API.
+ * Returns { name, email, profileImage } or null on failure.
+ */
+async function fetchClerkDetails(clerkId) {
+  try {
+    const clerkUser = await clerkClient.users.getUser(clerkId);
+    if (clerkUser) {
+      const name =
+        `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() ||
+        clerkUser.username ||
+        null;
+      const email =
+        clerkUser.emailAddresses?.[0]?.emailAddress || null;
+      const profileImage = clerkUser.imageUrl || "";
+      return { name, email, profileImage };
+    }
+  } catch (e) {
+    console.warn(`[UserService] Clerk API fetch failed for ${clerkId}: ${e.message}`);
+  }
+  return null;
+}
+
+/**
+ * Resolve the best name and email from available sources.
+ * Priority: initialData (session claims) → Clerk API → fallback placeholder
+ */
+function isPlaceholderEmail(email) {
+  return !email || email.endsWith("@clerk.user");
+}
+
+function isPlaceholderName(name) {
+  return !name || name === "Candidate User" || name.trim() === "";
+}
+
+/**
+ * Central user onboarding & synchronization.
+ * Called on every authenticated request via protectRoute.
+ * Ensures every Clerk user has a complete, real MongoDB record.
  */
 export async function syncOrCreateUser(clerkId, initialData = {}) {
-  if (!clerkId) {
-    throw new Error("clerkId is required for user synchronization");
-  }
+  if (!clerkId) throw new Error("clerkId is required for user synchronization");
 
-  // 1. Search MongoDB for existing user by clerkId
   let user = await User.findOne({ clerkId });
-
-  // Helper to fetch full details from Clerk API
-  const fetchClerkDetails = async () => {
-    try {
-      const clerkUser = await clerkClient.users.getUser(clerkId);
-      if (clerkUser) {
-        const name = `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() || clerkUser.username || "Candidate User";
-        const email = clerkUser.emailAddresses?.[0]?.emailAddress || `${clerkId}@clerk.user`;
-        const profileImage = clerkUser.imageUrl || "";
-        return { name, email, profileImage };
-      }
-    } catch (e) {
-      console.warn("Could not fetch Clerk user profile details:", e.message);
-    }
-    return null;
-  };
 
   if (user) {
     let updated = false;
 
-    // Self-healing Candidate Key check
+    // --- Self-heal: Candidate Key ---
     if (!user.candidateId || !user.candidateKey) {
-      console.log(`🔧 Self-healing Candidate Key for user ${clerkId}`);
       const newKey = await generateUniqueCandidateKey();
       user.candidateId = user.candidateId || newKey;
       user.candidateKey = user.candidateKey || newKey;
       updated = true;
+      console.log(`[UserService] 🔧 Self-healed Candidate Key for ${clerkId}: ${newKey}`);
     }
 
-    // Self-healing Placeholder Email/Name check
-    if (user.email?.endsWith("@clerk.user") || user.name === "Candidate User") {
-      let realDetails = null;
-      
-      // Try using the session claims passed in initialData first
-      if (initialData.email && !initialData.email.endsWith("@clerk.user")) {
-        realDetails = initialData;
-      } else {
-        realDetails = await fetchClerkDetails();
+    // --- Self-heal: Placeholder email or name ---
+    const needsEmailFix = isPlaceholderEmail(user.email);
+    const needsNameFix = isPlaceholderName(user.name);
+
+    if (needsEmailFix || needsNameFix) {
+      // Try session claims first (fastest, no network call)
+      let realEmail = (!isPlaceholderEmail(initialData.email)) ? initialData.email : null;
+      let realName = (!isPlaceholderName(initialData.name)) ? initialData.name : null;
+
+      // Fallback to Clerk API if session claims are incomplete
+      if (!realEmail || !realName) {
+        const clerkDetails = await fetchClerkDetails(clerkId);
+        if (clerkDetails) {
+          realEmail = realEmail || clerkDetails.email;
+          realName = realName || clerkDetails.name;
+        }
       }
 
-      if (realDetails && realDetails.email && !realDetails.email.endsWith("@clerk.user")) {
-        user.email = realDetails.email;
-        user.name = realDetails.name && realDetails.name !== "Candidate User" ? realDetails.name : user.name;
-        user.profileImage = realDetails.profileImage || user.profileImage;
+      if (realEmail && needsEmailFix) {
+        user.email = realEmail;
         updated = true;
-        console.log(`✨ Self-healed real user profile in MongoDB: ${user.name} (${user.email})`);
+      }
+      if (realName && needsNameFix) {
+        user.name = realName;
+        updated = true;
+      }
+      if (initialData.profileImage && !user.profileImage) {
+        user.profileImage = initialData.profileImage;
+        updated = true;
+      }
+
+      if (updated) {
+        console.log(`[UserService] ✨ Self-healed profile: ${user.name} (${user.email})`);
       }
     }
 
     if (updated) {
-      await user.save();
+      try {
+        await user.save();
+      } catch (saveErr) {
+        // Handle duplicate email conflict — find the real record
+        if (saveErr.code === 11000) {
+          console.warn(`[UserService] Duplicate key on save — refetching user: ${saveErr.message}`);
+          user = await User.findOne({ clerkId });
+        } else {
+          throw saveErr;
+        }
+      }
     }
+
     return user;
   }
 
-  // 2. User does NOT exist in MongoDB -> Onboard New User
-  console.log(`✨ Onboarding new user in MongoDB for clerkId: ${clerkId}`);
+  // ─── New User Onboarding ──────────────────────────────────────────────────
+  console.log(`[UserService] ✨ Onboarding new user for clerkId: ${clerkId}`);
 
-  let realDetails = null;
-  // Use session claims if available
-  if (initialData.email && !initialData.email.endsWith("@clerk.user")) {
-    realDetails = initialData;
-  } else {
-    realDetails = await fetchClerkDetails();
+  // Resolve name and email — session claims → Clerk API → fallback
+  let resolvedName = (!isPlaceholderName(initialData.name)) ? initialData.name : null;
+  let resolvedEmail = (!isPlaceholderEmail(initialData.email)) ? initialData.email : null;
+  let resolvedImage = initialData.profileImage || "";
+
+  if (!resolvedName || !resolvedEmail) {
+    const clerkDetails = await fetchClerkDetails(clerkId);
+    if (clerkDetails) {
+      resolvedName = resolvedName || clerkDetails.name;
+      resolvedEmail = resolvedEmail || clerkDetails.email;
+      resolvedImage = resolvedImage || clerkDetails.profileImage;
+    }
   }
 
-  const name = realDetails?.name && realDetails.name !== "Candidate User" ? realDetails.name : "Candidate User";
-  const email = realDetails?.email || `${clerkId}@clerk.user`;
-  const profileImage = realDetails?.profileImage || "";
+  // Final fallbacks — only used if Clerk API also fails
+  const finalName = resolvedName || "Candidate User";
+  const finalEmail = resolvedEmail || `${clerkId}@clerk.user`;
 
-  // Generate guaranteed unique candidate key
+  if (finalEmail.endsWith("@clerk.user")) {
+    console.warn(`[UserService] ⚠️  Using placeholder email for ${clerkId} — Clerk API may be misconfigured`);
+  }
+
+  // Generate unique Candidate Key
   const candidateKey = await generateUniqueCandidateKey();
 
-  // Create User in MongoDB
+  // Create MongoDB user
   try {
     user = await User.create({
       clerkId,
-      email,
-      name,
-      profileImage,
+      email: finalEmail,
+      name: finalName,
+      profileImage: resolvedImage,
       role: "pending",
       candidateId: candidateKey,
       candidateKey: candidateKey,
     });
-    console.log(`✅ Created MongoDB User ${user._id} (${user.name}) with Key: ${candidateKey}`);
+    console.log(`[UserService] ✅ Created user ${user._id} — ${finalName} (${finalEmail}) — Key: ${candidateKey}`);
   } catch (dbErr) {
-    console.warn("MongoDB User.create warning, attempting recovery:", dbErr.message);
-    user = await User.findOne({ clerkId });
-    if (!user) {
-      const fallbackEmail = `${clerkId}_${Date.now()}@clerk.user`;
-      user = await User.create({
-        clerkId,
-        email: fallbackEmail,
-        name,
-        profileImage,
-        role: "pending",
-        candidateId: candidateKey,
-        candidateKey: candidateKey,
-      });
+    // Race condition: another request already created this user
+    if (dbErr.code === 11000) {
+      console.warn(`[UserService] Race condition detected — user already created: ${clerkId}`);
+      user = await User.findOne({ clerkId });
+      if (user) return user;
     }
+    // Email duplicate with a different clerkId — use timestamped fallback
+    const fallbackEmail = `${clerkId.slice(-8)}_${Date.now()}@clerk.user`;
+    user = await User.create({
+      clerkId,
+      email: fallbackEmail,
+      name: finalName,
+      profileImage: resolvedImage,
+      role: "pending",
+      candidateId: candidateKey,
+      candidateKey: candidateKey,
+    });
+    console.warn(`[UserService] ⚠️  Created with fallback email ${fallbackEmail}`);
   }
 
-  // Auto-initialize Welcome Notification in MongoDB
+  // Welcome notification
   try {
     await Notification.create({
       recipient: user._id,
       sender: user._id,
       title: "Welcome to Talent IQ!",
-      message: `Your account is ready. Your permanent Candidate Key is "${candidateKey}". Share this key with hosts to receive interview invitations.`,
+      message: `Your account is ready. Your permanent Candidate Key is "${candidateKey}". Share it with hosts to receive interview invitations.`,
       type: "status_update",
     });
-  } catch (notifErr) {
-    console.warn("Welcome notification creation warning:", notifErr.message);
+  } catch (e) {
+    console.warn("[UserService] Welcome notification skipped:", e.message);
   }
 
-  // Auto-initialize Activity log in MongoDB
+  // Activity log
   try {
     await Activity.create({
       userId: user._id,
       action: "USER_ONBOARDED",
       details: `New user onboarded with Candidate Key: ${candidateKey}`,
     });
-  } catch (actErr) {
-    console.warn("Activity log creation warning:", actErr.message);
+  } catch (e) {
+    console.warn("[UserService] Activity log skipped:", e.message);
   }
 
-  // Upsert to Stream Video/Chat SDKs
+  // Async Stream SDK upsert — non-blocking
   upsertStreamUser({
-    id: clerkId.toString(),
+    id: clerkId,
     name: user.name,
     image: user.profileImage,
-  }).catch((err) => console.warn("Async Stream user upsert warning:", err.message));
+  }).catch((e) => console.warn("[UserService] Stream upsert warning:", e.message));
 
   return user;
 }

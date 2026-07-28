@@ -78,6 +78,28 @@ export async function getMyRecentSessions(req, res) {
   }
 }
 
+export async function getMyActiveSessions(req, res) {
+  try {
+    const userId = req.user._id;
+
+    // Active sessions where the user is host or participant
+    const sessions = await Session.find({
+      status: "active",
+      $or: [{ host: userId }, { participant: userId }],
+    })
+      .populate("host", "name profileImage email clerkId")
+      .populate("participant", "name profileImage email clerkId")
+      .sort({ createdAt: -1 })
+      .limit(10);
+
+    res.status(200).json({ sessions });
+  } catch (error) {
+    console.log("Error in getMyActiveSessions controller:", error.message);
+    res.status(500).json({ message: "Internal Server Error" });
+  }
+}
+
+
 export async function getSessionById(req, res) {
   try {
     const { id } = req.params;

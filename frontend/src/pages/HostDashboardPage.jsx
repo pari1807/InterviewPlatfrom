@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 import { AppLayout } from "../components/layout/AppLayout";
 import { Card } from "../components/ui/Card";
 import { Badge } from "../components/ui/Badge";
@@ -17,9 +17,11 @@ import {
   UserCheck,
   ChevronLeft,
   ChevronRight,
+  Video,
+  ArrowRight,
 } from "lucide-react";
 import { PROBLEMS } from "../data/problems";
-import { useActiveSessions, useMyRecentSessions } from "../hooks/useSessions";
+import { useActiveSessions, useMyRecentSessions, useMyActiveSessions } from "../hooks/useSessions";
 import { useDbUser } from "../context/UserContext";
 import axios from "../lib/axios";
 
@@ -79,19 +81,29 @@ export default function HostDashboardPage() {
   const [candidateSearch, setCandidateSearch] = useState("");
   const [loadingCandidates, setLoadingCandidates] = useState(false);
 
-  const { data: activeSessionsData, isLoading: loadingActive } = useActiveSessions();
-  const { data: recentSessionsData } = useMyRecentSessions();
+  // Only fetch session data when confirmed as host — prevents premature 401 errors
+  const isHost = !loadingDbUser && dbUser?.role === "host";
+
+  const { data: activeSessionsData, isLoading: loadingActive } = useActiveSessions({ enabled: isHost });
+  const { data: recentSessionsData } = useMyRecentSessions({ enabled: isHost });
+  const { data: myActiveSessionsData } = useMyActiveSessions({ enabled: isHost });
+
   const activeSessions = activeSessionsData?.sessions || [];
   const recentSessions = recentSessionsData?.sessions || [];
+  const myActiveSessions = myActiveSessionsData?.sessions || [];
 
-  // Role Guard: Only Host can access Host Dashboard
+  // Role Guard: Redirect candidates away from host dashboard
   useEffect(() => {
     if (!loadingDbUser && dbUser && dbUser.role === "candidate") {
-      navigate("/candidate-dashboard");
+      navigate("/candidate-dashboard", { replace: true });
+    }
+    if (!loadingDbUser && dbUser && dbUser.role === "pending") {
+      navigate("/dashboard", { replace: true });
     }
   }, [dbUser, loadingDbUser, navigate]);
 
   const fetchCandidates = async (search = "", page = 1) => {
+    if (!isHost) return;
     setLoadingCandidates(true);
     try {
       const res = await axios.get(`/users/candidates?search=${encodeURIComponent(search)}&page=${page}&limit=50`);
@@ -106,37 +118,38 @@ export default function HostDashboardPage() {
   };
 
   useEffect(() => {
-    if (dbUser?.role === "host") {
+    if (isHost) {
       fetchCandidates(candidateSearch, candidatePage);
     }
-  }, [candidatePage, dbUser?.role]);
+  }, [candidatePage, isHost]);
 
-  // Search with debounce
+  // Debounced search
   useEffect(() => {
-    if (dbUser?.role === "host") {
-      const timer = setTimeout(() => {
-        setCandidatePage(1);
-        fetchCandidates(candidateSearch, 1);
-      }, 300);
-      return () => clearTimeout(timer);
-    }
-  }, [candidateSearch, dbUser?.role]);
+    if (!isHost) return;
+    const timer = setTimeout(() => {
+      setCandidatePage(1);
+      fetchCandidates(candidateSearch, 1);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [candidateSearch, isHost]);
 
   const handleSelectCandidate = (candidate) => {
     setSelectedCandidateId(candidate.candidateKey || candidate.candidateId);
     setShowCreateModal(true);
   };
 
-  if (loadingDbUser) {
+  // ── Loading state ─────────────────────────────────────────────────────────
+  if (loadingDbUser || !dbUser) {
     return (
       <div className="h-screen bg-slate-900 flex flex-col items-center justify-center text-white gap-3">
         <Loader2 className="size-8 animate-spin text-emerald-500" />
-        <p className="text-sm font-semibold">Verifying Host Authorization...</p>
+        <p className="text-sm font-semibold">Loading Host Dashboard...</p>
       </div>
     );
   }
 
-  if (dbUser?.role !== "host") {
+  // ── Role check — only AFTER loading is confirmed complete ─────────────────
+  if (dbUser.role !== "host") {
     return null;
   }
 
@@ -165,6 +178,41 @@ export default function HostDashboardPage() {
             <span>Schedule Interview</span>
           </Button>
         </div>
+
+        {/* Active Sessions the host can rejoin */}
+        {myActiveSessions.length > 0 && (
+          <div className="space-y-3">
+            <h2 className="text-base font-extrabold text-slate-900 flex items-center gap-2">
+              <Video className="size-5 text-emerald-600" />
+              Your Active Interviews — Rejoin Anytime
+            </h2>
+            {myActiveSessions.map((session) => (
+              <div
+                key={session._id}
+                className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-between gap-3"
+              >
+                <div>
+                  <p className="text-sm font-bold text-slate-900">
+                    {session.problem}
+                    <span className="ml-2 text-xs font-medium text-emerald-700 capitalize">
+                      ({session.difficulty})
+                    </span>
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    Candidate: {session.participant?.name || "Waiting for candidate..."}
+                  </p>
+                </div>
+                <Link to={`/session/${session._id}`}>
+                  <Button variant="emeraldGradient" size="sm">
+                    <Video className="size-3.5" />
+                    Rejoin
+                    <ArrowRight className="size-3.5" />
+                  </Button>
+                </Link>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Stats Row */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -209,7 +257,7 @@ export default function HostDashboardPage() {
               </div>
             </div>
 
-            {/* Search input */}
+            {/* Search */}
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-3 top-2.5 size-4 text-slate-400" />
               <input
@@ -222,7 +270,6 @@ export default function HostDashboardPage() {
             </div>
           </div>
 
-          {/* Candidate grid */}
           {loadingCandidates ? (
             <div className="flex items-center justify-center py-12 text-slate-400 gap-2">
               <Loader2 className="size-5 animate-spin text-emerald-500" />
@@ -287,7 +334,7 @@ export default function HostDashboardPage() {
           }}
         />
 
-        {/* Active Sessions */}
+        {/* All Active Sessions */}
         <ActiveSessions
           sessions={activeSessions}
           isLoading={loadingActive}

@@ -21,6 +21,7 @@ import {
   Copy,
   Check,
   Loader2,
+  LayoutDashboard,
 } from "lucide-react";
 import axios from "../lib/axios";
 import { getSocket } from "../lib/socket";
@@ -50,27 +51,27 @@ function InvitationCard({ notification, onJoin }) {
 
   return (
     <div
-      className={`p-4 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+      className={`p-5 rounded-2xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-4 ${
         isNew
-          ? "bg-emerald-50/60 border-emerald-300/80 shadow-sm"
+          ? "bg-gradient-to-r from-emerald-500/10 via-teal-500/5 to-transparent border-emerald-400/60 shadow-md ring-1 ring-emerald-500/20"
           : "bg-white border-slate-200/80"
       }`}
     >
-      <div className="flex items-start gap-3">
-        <div className={`p-2.5 rounded-xl shrink-0 ${isNew ? "bg-emerald-100 text-emerald-600" : "bg-slate-100 text-slate-500"}`}>
-          <Video className="size-5" />
+      <div className="flex items-start gap-3.5">
+        <div className={`p-3 rounded-2xl shrink-0 ${isNew ? "bg-emerald-500 text-white shadow-md shadow-emerald-500/30" : "bg-slate-100 text-slate-500"}`}>
+          <Video className="size-6" />
         </div>
         <div>
-          <div className="flex items-center gap-2 mb-0.5">
-            <h4 className="font-bold text-slate-900 text-sm">{notification.title || "Interview Invitation"}</h4>
+          <div className="flex items-center gap-2 mb-1">
+            <h4 className="font-extrabold text-slate-900 text-base">{notification.title || "Interview Invitation"}</h4>
             {isNew && (
-              <span className="px-1.5 py-0.5 rounded-full bg-emerald-500 text-white text-[9px] font-extrabold uppercase">
-                New
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500 text-white text-[10px] font-extrabold uppercase tracking-wide">
+                Live Invite
               </span>
             )}
           </div>
           <p className="text-xs text-slate-600 leading-relaxed">{notification.message || ""}</p>
-          <p className="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+          <p className="text-[10px] text-slate-400 mt-1.5 flex items-center gap-1 font-medium">
             <Clock className="size-3" />
             {createdAt}
           </p>
@@ -79,9 +80,9 @@ function InvitationCard({ notification, onJoin }) {
 
       {sessionId && (
         <Link to={`/session/${sessionId}`} onClick={() => notification._id && onJoin(notification._id)}>
-          <Button variant="emeraldGradient" size="sm" className="shrink-0 w-full sm:w-auto">
-            <Video className="size-3.5" />
-            <span>Join Interview</span>
+          <Button variant="emeraldGradient" size="md" className="shrink-0 w-full sm:w-auto shadow-md">
+            <Video className="size-4" />
+            <span>Join Live Interview</span>
           </Button>
         </Link>
       )}
@@ -97,10 +98,13 @@ export default function CandidateDashboardPage() {
   const [loadingNotifications, setLoadingNotifications] = useState(true);
   const [copied, setCopied] = useState(false);
 
-  // Role Guard: Host accounts are redirected to Host Dashboard
+  // Role Guard: Redirect hosts away from candidate dashboard
   useEffect(() => {
     if (!loadingDbUser && dbUser && dbUser.role === "host") {
-      navigate("/host-dashboard");
+      navigate("/host-dashboard", { replace: true });
+    }
+    if (!loadingDbUser && dbUser && dbUser.role === "pending") {
+      navigate("/dashboard", { replace: true });
     }
   }, [dbUser, loadingDbUser, navigate]);
 
@@ -117,6 +121,7 @@ export default function CandidateDashboardPage() {
   };
 
   useEffect(() => {
+    if (!dbUser) return;
     fetchNotifications();
 
     const socket = getSocket();
@@ -142,7 +147,7 @@ export default function CandidateDashboardPage() {
 
     socket.on("new_notification", handleNewNotif);
     return () => socket.off("new_notification", handleNewNotif);
-  }, [user?.id]);
+  }, [user?.id, dbUser]);
 
   const handleMarkRead = async (id) => {
     if (!id) return;
@@ -167,7 +172,8 @@ export default function CandidateDashboardPage() {
     : [];
   const pendingInvitations = safeNotifications.filter((n) => !n.isRead && n.type === "invitation");
 
-  if (loadingDbUser) {
+  // ── Loading state ─────────────────────────────────────────────────────────
+  if (loadingDbUser || !dbUser) {
     return (
       <div className="h-screen bg-slate-900 flex flex-col items-center justify-center text-white gap-3">
         <Loader2 className="size-8 animate-spin text-emerald-500" />
@@ -176,51 +182,49 @@ export default function CandidateDashboardPage() {
     );
   }
 
-  if (dbUser?.role === "host") {
-    return null;
-  }
-
   return (
     <AppLayout>
       <div className="space-y-8 animate-fade-in">
-        {/* Candidate ID Hero */}
-        <div className="p-6 rounded-3xl bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-800 text-white shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
+        {/* Candidate Header Banner */}
+        <div className="p-8 rounded-3xl bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-800 text-white shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
           <div className="space-y-2">
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/20 border border-emerald-400/30 text-emerald-300 text-xs font-semibold">
-              <UserCheck className="size-3.5" />
-              <span>Candidate Profile</span>
+              <LayoutDashboard className="size-3.5" />
+              <span>Candidate Dashboard</span>
             </div>
-            <h1 className="text-2xl font-extrabold tracking-tight">
-              Welcome, {user?.firstName || "Candidate"}
+            <h1 className="text-3xl font-extrabold tracking-tight">
+              Welcome, {dbUser?.name || user?.firstName || "Candidate"}
             </h1>
             <p className="text-slate-300 text-sm max-w-lg">
               Share your unique Candidate Key with interviewers to receive live interview invitations.
             </p>
           </div>
 
-          {/* Candidate Key Card */}
+          {/* Candidate Key Display Card */}
           <div
             onClick={handleCopyId}
-            className="flex items-center gap-3 px-5 py-3 rounded-2xl bg-white/10 border border-white/20 cursor-pointer hover:bg-white/15 transition-all"
+            className="flex items-center gap-4 px-6 py-4 rounded-2xl bg-white/10 border border-white/20 hover:bg-white/15 transition-all cursor-pointer group shrink-0"
             title="Click to copy Candidate Key"
           >
             <div>
               <p className="text-[10px] text-emerald-300 font-bold uppercase tracking-widest">
                 Your Candidate Key
               </p>
-              <p className="text-xl font-extrabold text-white font-mono tracking-widest">
+              <p className="text-2xl font-extrabold text-white font-mono tracking-widest mt-0.5">
                 {candidateKey || "CAND-..."}
               </p>
             </div>
-            {copied ? (
-              <Check className="size-5 text-emerald-400 shrink-0" />
-            ) : (
-              <Copy className="size-5 text-slate-400 shrink-0" />
-            )}
+            <div className="p-2.5 rounded-xl bg-white/10 group-hover:bg-white/20 text-white transition-all">
+              {copied ? (
+                <Check className="size-5 text-emerald-400 shrink-0" />
+              ) : (
+                <Copy className="size-5 text-slate-300 shrink-0" />
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Interview Invitations Section */}
+        {/* Live Interview Invitations Section */}
         <div>
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-3">
@@ -228,7 +232,7 @@ export default function CandidateDashboardPage() {
                 <Bell className="size-5" />
               </div>
               <div>
-                <h2 className="text-base font-extrabold text-slate-900">Interview Invitations</h2>
+                <h2 className="text-base font-extrabold text-slate-900">Live Interview Invitations</h2>
                 <p className="text-xs text-slate-500">
                   {pendingInvitations.length > 0
                     ? `${pendingInvitations.length} new invitation${pendingInvitations.length > 1 ? "s" : ""} waiting`
@@ -238,7 +242,7 @@ export default function CandidateDashboardPage() {
             </div>
             {pendingInvitations.length > 0 && (
               <Badge variant="emerald" size="sm">
-                {pendingInvitations.length} New
+                {pendingInvitations.length} New Invite{pendingInvitations.length > 1 ? "s" : ""}
               </Badge>
             )}
           </div>
@@ -246,14 +250,14 @@ export default function CandidateDashboardPage() {
           {loadingNotifications ? (
             <div className="flex items-center justify-center py-10 text-slate-400 gap-2">
               <Loader2 className="size-5 animate-spin text-emerald-500" />
-              <span className="text-sm">Loading invitations...</span>
+              <span className="text-sm">Checking for invitations...</span>
             </div>
           ) : safeNotifications.length === 0 ? (
             <Card className="p-8 text-center">
               <Bell className="size-10 mx-auto mb-3 text-slate-300" />
               <p className="font-bold text-slate-600">No interview invitations yet</p>
               <p className="text-xs text-slate-400 mt-1">
-                Share your Candidate Key with interviewers. Invitations appear here in real time.
+                Share your Candidate Key (<span className="font-mono font-bold text-emerald-600">{candidateKey}</span>) with interviewers to receive invitations in real time.
               </p>
             </Card>
           ) : (
@@ -265,11 +269,58 @@ export default function CandidateDashboardPage() {
           )}
         </div>
 
-        {/* Analytics Charts */}
+        {/* Quick Actions & Practice Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <Card className="p-6 flex flex-col justify-between bg-gradient-to-br from-white to-slate-50">
+            <div>
+              <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs mb-3">
+                <Code2 className="size-4" />
+                <span>Coding Practice</span>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Practice Technical Screens</h3>
+              <p className="text-slate-500 text-xs leading-relaxed">
+                Solve real algorithmic coding problems across Data Structures, Dynamic Programming, and System Design with live Gemini AI feedback.
+              </p>
+            </div>
+
+            <div className="mt-6">
+              <Link to="/problems">
+                <Button variant="emeraldGradient" size="md" className="w-full">
+                  <Code2 className="size-4" />
+                  <span>Start Practice Problems</span>
+                </Button>
+              </Link>
+            </div>
+          </Card>
+
+          <Card className="p-6 flex flex-col justify-between bg-gradient-to-br from-white to-slate-50">
+            <div>
+              <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs mb-3">
+                <CheckCircle2 className="size-4" />
+                <span>Interview Records</span>
+              </div>
+              <h3 className="text-xl font-bold text-slate-900 mb-2">Previous Interviews</h3>
+              <p className="text-slate-500 text-xs leading-relaxed">
+                Review code recordings, host feedback notes, and AI evaluation metrics from your past completed live interviews.
+              </p>
+            </div>
+
+            <div className="mt-6">
+              <Link to="/history">
+                <Button variant="outline" size="md" className="w-full">
+                  <CheckCircle2 className="size-4" />
+                  <span>View Interview History</span>
+                </Button>
+              </Link>
+            </div>
+          </Card>
+        </div>
+
+        {/* Candidate Analytics Section (Secondary) */}
         <div>
           <h2 className="text-base font-extrabold text-slate-900 mb-4 flex items-center gap-2">
             <TrendingUp className="size-5 text-emerald-600" />
-            Performance Analytics
+            Candidate Skill Analytics
           </h2>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -297,49 +348,6 @@ export default function CandidateDashboardPage() {
                 </div>
               </div>
               <SkillRadarChart />
-            </Card>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-            <Card className="p-6">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/60">
-                  <BookOpen className="size-5" />
-                </div>
-                <div>
-                  <h3 className="text-base font-bold text-slate-900">Problems by Topic</h3>
-                  <p className="text-xs text-slate-500">Distribution across algorithmic domains</p>
-                </div>
-              </div>
-              <CategoryPieChart />
-            </Card>
-
-            <Card className="p-6 flex flex-col justify-between">
-              <div>
-                <div className="flex items-center gap-2 text-emerald-600 font-bold text-xs mb-3">
-                  <Sparkles className="size-4" />
-                  <span>Quick Actions</span>
-                </div>
-                <h3 className="text-xl font-bold text-slate-900 mb-2">Interview Prep</h3>
-                <p className="text-slate-500 text-xs leading-relaxed">
-                  Practice coding problems to improve your algorithm skills before your next live interview.
-                </p>
-              </div>
-
-              <div className="mt-6 flex flex-col gap-3">
-                <Link to="/problems">
-                  <Button variant="emeraldGradient" size="md" className="w-full">
-                    <Code2 className="size-4" />
-                    <span>Practice Problems</span>
-                  </Button>
-                </Link>
-                <Link to="/history">
-                  <Button variant="outline" size="md" className="w-full">
-                    <CheckCircle2 className="size-4" />
-                    <span>View Interview History</span>
-                  </Button>
-                </Link>
-              </div>
             </Card>
           </div>
         </div>
