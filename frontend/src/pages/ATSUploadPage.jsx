@@ -106,6 +106,16 @@ export default function ATSUploadPage() {
       data.feedback = parsedFeedback;
       await kv.set(`resume:${uuid}`, JSON.stringify(data));
 
+      // Save to MongoDB for logged-in user account isolation
+      try {
+        await atsApi.analyzeATS({
+          jobTitle: `${companyName} - ${jobTitle}`,
+          jobDescription,
+        });
+      } catch (dbErr) {
+        console.warn("MongoDB ATS report save warning:", dbErr.message);
+      }
+
       // Synchronize to local Zustand store
       addResume({
         id: uuid,

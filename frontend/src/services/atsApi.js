@@ -10,4 +10,14 @@ export const atsApi = {
     });
     return response.data;
   },
+
+  getUserReports: async () => {
+    const response = await apiClient.get("/resume-ai/ats-reports");
+    return response.data;
+  },
+
+  deleteReport: async (reportId) => {
+    const response = await apiClient.delete(`/resume-ai/ats-reports/${reportId}`);
+    return response.data;
+  },
 };

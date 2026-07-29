@@ -232,3 +232,31 @@ export const analyzeATS = async (req, res) => {
     return res.status(500).json({ message: "ATS Analysis failed" });
   }
 };
+
+// Get user specific ATS reports from MongoDB
+export const getUserATSReports = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const reports = await ATSReport.find({ userId }).sort({ createdAt: -1 });
+    return res.status(200).json({ reports });
+  } catch (error) {
+    console.error("getUserATSReports error:", error.message);
+    return res.status(400).json({ message: error.message || "Failed to fetch ATS reports" });
+  }
+};
+
+// Delete user specific ATS report
+export const deleteATSReport = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { reportId } = req.params;
+    const report = await ATSReport.findOneAndDelete({ _id: reportId, userId });
+    if (!report) {
+      return res.status(404).json({ message: "Report not found or unauthorized" });
+    }
+    return res.status(200).json({ message: "ATS report deleted successfully" });
+  } catch (error) {
+    console.error("deleteATSReport error:", error.message);
+    return res.status(400).json({ message: error.message || "Failed to delete report" });
+  }
+};
