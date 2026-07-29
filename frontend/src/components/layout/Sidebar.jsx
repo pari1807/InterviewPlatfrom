@@ -43,7 +43,7 @@ export function Sidebar({ isOpen, onClose }) {
   // Role-aware navigation: Host does NOT see Resume Builder or ATS Analyzer
   const candidateItems = [
     { label: "Resume Builder", icon: FileText, path: "/resume" },
-    { label: "ATS Resume Scanner", icon: Sparkles, path: "/ats" },
+    { label: "ATS Resume Analyzer", icon: Sparkles, path: "/ats-analysis" },
   ];
 
   const commonItems = [

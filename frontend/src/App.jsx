@@ -10,6 +10,8 @@ import ResumeDashboardPage from "./pages/ResumeDashboardPage";
 import ResumeBuilderPage from "./pages/ResumeBuilderPage";
 import ResumePreviewPage from "./pages/ResumePreviewPage";
 import ATSAnalysisPage from "./pages/ATSAnalysisPage";
+import ATSUploadPage from "./pages/ATSUploadPage";
+import ATSReportDetailsPage from "./pages/ATSReportDetailsPage";
 import ProblemsPage from "./pages/ProblemsPage";
 import ProblemPage from "./pages/ProblemPage";
 import SessionPage from "./pages/SessionPage";
@@ -36,6 +38,11 @@ function App() {
         <Route path="/resume" element={isSignedIn ? <ResumeDashboardPage /> : <Navigate to="/" />} />
         <Route path="/resume/builder/:resumeId" element={isSignedIn ? <ResumeBuilderPage /> : <Navigate to="/" />} />
         <Route path="/resume/view/:resumeId" element={<ResumePreviewPage />} />
+        
+        {/* ATS Resume Analyzer Routes */}
+        <Route path="/ats-analysis" element={isSignedIn ? <ATSAnalysisPage /> : <Navigate to="/" />} />
+        <Route path="/ats-analysis/upload" element={isSignedIn ? <ATSUploadPage /> : <Navigate to="/" />} />
+        <Route path="/ats-analysis/report/:id" element={isSignedIn ? <ATSReportDetailsPage /> : <Navigate to="/" />} />
         <Route path="/ats" element={isSignedIn ? <ATSAnalysisPage /> : <Navigate to="/" />} />
 
         {/* Interview Platform Routes */}
