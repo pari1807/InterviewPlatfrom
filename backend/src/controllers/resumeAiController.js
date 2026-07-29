@@ -189,6 +189,22 @@ export const analyzeATS = async (req, res) => {
     const { resumeId, jobDescription } = req.body;
     const userId = req.user._id;
     const clerkId = req.user.clerkId;
+    const {
+      companyName,
+      jobTitle,
+      jobDescription,
+      imageDataUrl,
+      imagePath,
+      resumePath,
+      puterUserId,
+      resumeId,
+      matchScore,
+      overallAssessment,
+      matchedKeywords,
+      missingKeywords,
+      strengths,
+      improvements,
+    } = req.body || {};
 
     if (!jobDescription) {
       return res.status(400).json({ message: "Job description is required" });
@@ -204,26 +220,34 @@ export const analyzeATS = async (req, res) => {
       }
     }
 
-    const prompt = `Analyze this resume against the following job description:\n\nJob Description:\n${jobDescription}\n\nResume Details:\n${resumeText || "No structured resume provided"}\n\nReturn JSON matching schema: { "matchScore": number (0-100), "overallAssessment": string, "matchedKeywords": [string], "missingKeywords": [string], "strengths": [string], "improvements": [string] }`;
-
     let result = null;
-    try {
-      result = await generateJSON(prompt, "You are an expert ATS (Applicant Tracking System) parser and resume auditor.");
-    } catch (apiErr) {
-      console.warn("[ATS-Analyze] Google API free quota limit hit during ATS analysis:", apiErr.message);
+    if (!matchScore) {
+      const prompt = `Analyze this resume against the following job description:\n\nJob Description:\n${jobDescription}\n\nResume Details:\n${resumeText || "No structured resume provided"}\n\nReturn JSON matching schema: { "matchScore": number (0-100), "overallAssessment": string, "matchedKeywords": [string], "missingKeywords": [string], "strengths": [string], "improvements": [string] }`;
+
+      try {
+        result = await generateJSON(prompt, "You are an expert ATS (Applicant Tracking System) parser and resume auditor.");
+      } catch (apiErr) {
+        console.warn("[ATS-Analyze] Google API free quota limit hit during ATS analysis:", apiErr.message);
+      }
     }
 
     const report = await ATSReport.create({
       userId,
       clerkId,
+      puterUserId: puterUserId || "",
       resumeId: resumeObj?._id,
+      companyName: companyName || "Target Company",
+      jobTitle: jobTitle || "Target Role",
       jobDescription,
-      matchScore: result?.matchScore || 82,
-      overallAssessment: result?.overallAssessment || "Strong technical resume alignment with core job requirements.",
-      matchedKeywords: result?.matchedKeywords || ["JavaScript", "React", "Node.js", "REST APIs", "Git"],
-      missingKeywords: result?.missingKeywords || ["CI/CD Pipelines", "Docker", "AWS"],
-      strengths: result?.strengths || ["Clear professional experience", "Strong technical skill set"],
-      improvements: result?.improvements || ["Quantify business metrics in experience bullets"],
+      imageDataUrl: imageDataUrl || "",
+      imagePath: imagePath || "",
+      resumePath: resumePath || "",
+      matchScore: matchScore || result?.matchScore || 82,
+      overallAssessment: overallAssessment || result?.overallAssessment || "Strong technical resume alignment with core job requirements.",
+      matchedKeywords: matchedKeywords || result?.matchedKeywords || ["JavaScript", "React", "Node.js", "REST APIs", "Git"],
+      missingKeywords: missingKeywords || result?.missingKeywords || ["CI/CD Pipelines", "Docker", "AWS"],
+      strengths: strengths || result?.strengths || ["Clear professional experience", "Strong technical skill set"],
+      improvements: improvements || result?.improvements || ["Quantify business metrics in experience bullets"],
     });
 
     return res.status(200).json({ report });

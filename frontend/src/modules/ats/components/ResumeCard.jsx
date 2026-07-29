@@ -38,7 +38,7 @@ export default function ResumeCard({ resume }) {
     };
   }, [resume, isMockResume]);
 
-  const renderSrc = imageUrl || (isMockResume ? resume.imagePath : "/images/resume_01.png");
+  const renderSrc = resume.imageDataUrl || imageUrl || (isMockResume ? resume.imagePath : "");
 
   return (
     <Link
