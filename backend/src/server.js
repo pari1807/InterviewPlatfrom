@@ -24,7 +24,29 @@ const __dirname = path.resolve();
 
 // middleware
 app.use(express.json());
-app.use(cors({ origin: ENV.CLIENT_URL, credentials: true }));
+
+// Dynamic CORS configuration allowing all development origins & custom Clerk headers
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, or same-origin)
+      if (!origin) return callback(null, true);
+      // In development or local/forwarded port setup, echo request origin to allow credentials
+      return callback(null, origin);
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization",
+      "x-clerk-user-id",
+      "x-clerk-user-name",
+      "x-clerk-user-email",
+      "x-clerk-user-image",
+    ],
+  })
+);
+
 app.use(clerkMiddleware());
 
 app.use("/api/inngest", serve({ client: inngest, functions }));

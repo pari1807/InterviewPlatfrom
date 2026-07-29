@@ -26,9 +26,16 @@ export function UserProvider({ children }) {
     setFetchError(null);
 
     try {
-      // 1. Get the Clerk JWT token
-      const token = await getToken();
-      
+      // 1. Get the Clerk JWT token with a 2s timeout fallback so auth never hangs
+      let token = null;
+      try {
+        const tokenPromise = getToken();
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 2000));
+        token = await Promise.race([tokenPromise, timeoutPromise]);
+      } catch (tokenErr) {
+        console.warn("[UserContext] getToken warning:", tokenErr.message);
+      }
+
       // 2. Inject token AND user details into axios interceptor
       setClerkToken(token || "session_token", {
         id: clerkUser.id,

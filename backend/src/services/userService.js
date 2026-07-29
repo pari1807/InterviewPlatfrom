@@ -29,12 +29,20 @@ export async function generateUniqueCandidateKey() {
 }
 
 /**
- * Fetch real user details from the Clerk Management API.
- * Returns { name, email, profileImage } or null on failure.
+ * Fetch real user details from the Clerk Management API with a strict 1.5s timeout.
+ * Prevents external API latency from hanging the authentication request.
  */
 async function fetchClerkDetails(clerkId) {
   try {
-    const clerkUser = await clerkClient.users.getUser(clerkId);
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("Clerk API timeout")), 1500)
+    );
+
+    const clerkUser = await Promise.race([
+      clerkClient.users.getUser(clerkId),
+      timeoutPromise,
+    ]);
+
     if (clerkUser) {
       const name =
         `${clerkUser.firstName || ""} ${clerkUser.lastName || ""}`.trim() ||
@@ -46,15 +54,11 @@ async function fetchClerkDetails(clerkId) {
       return { name, email, profileImage };
     }
   } catch (e) {
-    console.warn(`[UserService] Clerk API fetch failed for ${clerkId}: ${e.message}`);
+    console.warn(`[UserService] Clerk API fetch skipped for ${clerkId}: ${e.message}`);
   }
   return null;
 }
 
-/**
- * Resolve the best name and email from available sources.
- * Priority: initialData (session claims) → Clerk API → fallback placeholder
- */
 function isPlaceholderEmail(email) {
   return !email || email.endsWith("@clerk.user");
 }
@@ -64,37 +68,53 @@ function isPlaceholderName(name) {
 }
 
 /**
- * Central user onboarding & synchronization.
- * Called on every authenticated request via protectRoute.
- * Ensures every Clerk user has a complete, real MongoDB record.
+ * Central User Onboarding & Synchronization
+ * 
+ * Instant (local-first) MongoDB user synchronization.
+ * Never hangs on external network calls.
  */
 export async function syncOrCreateUser(clerkId, initialData = {}) {
   if (!clerkId) throw new Error("clerkId is required for user synchronization");
 
+  // 1. Search by clerkId
   let user = await User.findOne({ clerkId });
 
+  // 2. If not found by clerkId, search by email to link existing accounts (prevents E11000 duplicate email errors!)
+  const inputEmail = initialData.email;
+  if (!user && inputEmail && !isPlaceholderEmail(inputEmail)) {
+    user = await User.findOne({ email: inputEmail.toLowerCase() });
+    if (user) {
+      user.clerkId = clerkId;
+      if (initialData.name && !isPlaceholderName(initialData.name)) user.name = initialData.name;
+      if (initialData.profileImage) user.profileImage = initialData.profileImage;
+      await user.save();
+      console.log(`[UserService] 🔗 Linked existing email (${user.email}) to new clerkId: ${clerkId}`);
+      return user;
+    }
+  }
+
+  // 3. Existing User Self-Healing (Instant local-first resolution)
   if (user) {
     let updated = false;
 
-    // --- Self-heal: Candidate Key ---
+    // Self-heal: Candidate Key
     if (!user.candidateId || !user.candidateKey) {
       const newKey = await generateUniqueCandidateKey();
-      user.candidateId = user.candidateId || newKey;
-      user.candidateKey = user.candidateKey || newKey;
+      user.candidateId = newKey;
+      user.candidateKey = newKey;
       updated = true;
       console.log(`[UserService] 🔧 Self-healed Candidate Key for ${clerkId}: ${newKey}`);
     }
 
-    // --- Self-heal: Placeholder email or name ---
+    // Self-heal: Placeholder email or name (only if initialData has real values)
     const needsEmailFix = isPlaceholderEmail(user.email);
     const needsNameFix = isPlaceholderName(user.name);
 
     if (needsEmailFix || needsNameFix) {
-      // Try session claims first (fastest, no network call)
       let realEmail = (!isPlaceholderEmail(initialData.email)) ? initialData.email : null;
       let realName = (!isPlaceholderName(initialData.name)) ? initialData.name : null;
 
-      // Fallback to Clerk API if session claims are incomplete
+      // Only attempt remote Clerk fetch if local initialData was incomplete
       if (!realEmail || !realName) {
         const clerkDetails = await fetchClerkDetails(clerkId);
         if (clerkDetails) {
@@ -104,7 +124,7 @@ export async function syncOrCreateUser(clerkId, initialData = {}) {
       }
 
       if (realEmail && needsEmailFix) {
-        user.email = realEmail;
+        user.email = realEmail.toLowerCase();
         updated = true;
       }
       if (realName && needsNameFix) {
@@ -115,37 +135,27 @@ export async function syncOrCreateUser(clerkId, initialData = {}) {
         user.profileImage = initialData.profileImage;
         updated = true;
       }
-
-      if (updated) {
-        console.log(`[UserService] ✨ Self-healed profile: ${user.name} (${user.email})`);
-      }
     }
 
     if (updated) {
       try {
         await user.save();
       } catch (saveErr) {
-        // Handle duplicate email conflict — find the real record
-        if (saveErr.code === 11000) {
-          console.warn(`[UserService] Duplicate key on save — refetching user: ${saveErr.message}`);
-          user = await User.findOne({ clerkId });
-        } else {
-          throw saveErr;
-        }
+        console.warn(`[UserService] Save self-heal warning for ${clerkId}: ${saveErr.message}`);
       }
     }
 
     return user;
   }
 
-  // ─── New User Onboarding ──────────────────────────────────────────────────
+  // 4. New User Onboarding (Instant local-first resolution)
   console.log(`[UserService] ✨ Onboarding new user for clerkId: ${clerkId}`);
 
-  // Resolve name and email — session claims → Clerk API → fallback
   let resolvedName = (!isPlaceholderName(initialData.name)) ? initialData.name : null;
   let resolvedEmail = (!isPlaceholderEmail(initialData.email)) ? initialData.email : null;
   let resolvedImage = initialData.profileImage || "";
 
+  // Only call Clerk API if local initialData was incomplete
   if (!resolvedName || !resolvedEmail) {
     const clerkDetails = await fetchClerkDetails(clerkId);
     if (clerkDetails) {
@@ -155,75 +165,80 @@ export async function syncOrCreateUser(clerkId, initialData = {}) {
     }
   }
 
-  // Final fallbacks — only used if Clerk API also fails
   const finalName = resolvedName || "Candidate User";
-  const finalEmail = resolvedEmail || `${clerkId}@clerk.user`;
+  let finalEmail = (resolvedEmail ? resolvedEmail.toLowerCase() : `${clerkId}@clerk.user`);
 
-  if (finalEmail.endsWith("@clerk.user")) {
-    console.warn(`[UserService] ⚠️  Using placeholder email for ${clerkId} — Clerk API may be misconfigured`);
+  // Check once more if email exists before creating
+  if (!isPlaceholderEmail(finalEmail)) {
+    const existingByEmail = await User.findOne({ email: finalEmail });
+    if (existingByEmail) {
+      existingByEmail.clerkId = clerkId;
+      await existingByEmail.save();
+      console.log(`[UserService] 🔗 Linked existing account by email (${finalEmail}) to clerkId: ${clerkId}`);
+      return existingByEmail;
+    }
   }
 
   // Generate unique Candidate Key
   const candidateKey = await generateUniqueCandidateKey();
 
-  // Create MongoDB user
-  try {
-    user = await User.create({
-      clerkId,
-      email: finalEmail,
-      name: finalName,
-      profileImage: resolvedImage,
-      role: "pending",
-      candidateId: candidateKey,
-      candidateKey: candidateKey,
-    });
-    console.log(`[UserService] ✅ Created user ${user._id} — ${finalName} (${finalEmail}) — Key: ${candidateKey}`);
-  } catch (dbErr) {
-    // Race condition: another request already created this user
-    if (dbErr.code === 11000) {
-      console.warn(`[UserService] Race condition detected — user already created: ${clerkId}`);
+  // Create User with retry loop for absolute safety
+  let attempts = 0;
+  while (!user && attempts < 3) {
+    attempts++;
+    try {
+      const keyToUse = attempts === 1 ? candidateKey : await generateUniqueCandidateKey();
+      const emailToUse = attempts === 1 ? finalEmail : `${clerkId.slice(-6)}_${Date.now()}@clerk.user`;
+
+      user = await User.create({
+        clerkId,
+        email: emailToUse,
+        name: finalName,
+        profileImage: resolvedImage,
+        role: "pending",
+        candidateId: keyToUse,
+        candidateKey: keyToUse,
+      });
+
+      console.log(`[UserService] ✅ Onboarded user ${user._id} — ${user.name} (${user.email}) — Key: ${user.candidateKey}`);
+    } catch (createErr) {
+      console.warn(`[UserService] User.create attempt ${attempts} warning: ${createErr.message}`);
       user = await User.findOne({ clerkId });
       if (user) return user;
     }
-    // Email duplicate with a different clerkId — use timestamped fallback
-    const fallbackEmail = `${clerkId.slice(-8)}_${Date.now()}@clerk.user`;
+  }
+
+  if (!user) {
+    const emergencyKey = `CAND-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+    const emergencyEmail = `${clerkId.slice(-6)}_${Date.now()}@clerk.user`;
     user = await User.create({
       clerkId,
-      email: fallbackEmail,
+      email: emergencyEmail,
       name: finalName,
       profileImage: resolvedImage,
       role: "pending",
-      candidateId: candidateKey,
-      candidateKey: candidateKey,
+      candidateId: emergencyKey,
+      candidateKey: emergencyKey,
     });
-    console.warn(`[UserService] ⚠️  Created with fallback email ${fallbackEmail}`);
   }
 
-  // Welcome notification
-  try {
-    await Notification.create({
-      recipient: user._id,
-      sender: user._id,
-      title: "Welcome to Talent IQ!",
-      message: `Your account is ready. Your permanent Candidate Key is "${candidateKey}". Share it with hosts to receive interview invitations.`,
-      type: "status_update",
-    });
-  } catch (e) {
-    console.warn("[UserService] Welcome notification skipped:", e.message);
-  }
+  // Welcome notification (non-blocking)
+  Notification.create({
+    recipient: user._id,
+    sender: user._id,
+    title: "Welcome to Talent IQ!",
+    message: `Your account is ready. Your permanent Candidate Key is "${user.candidateKey}". Share it with hosts to receive interview invitations.`,
+    type: "status_update",
+  }).catch(() => {});
 
-  // Activity log
-  try {
-    await Activity.create({
-      userId: user._id,
-      action: "USER_ONBOARDED",
-      details: `New user onboarded with Candidate Key: ${candidateKey}`,
-    });
-  } catch (e) {
-    console.warn("[UserService] Activity log skipped:", e.message);
-  }
+  // Activity log (non-blocking)
+  Activity.create({
+    userId: user._id,
+    action: "USER_ONBOARDED",
+    details: `New user onboarded with Candidate Key: ${user.candidateKey}`,
+  }).catch(() => {});
 
-  // Async Stream SDK upsert — non-blocking
+  // Async Stream SDK upsert (non-blocking)
   upsertStreamUser({
     id: clerkId,
     name: user.name,
