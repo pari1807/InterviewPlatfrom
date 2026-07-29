@@ -171,23 +171,34 @@ export default function ATSReportDetailsPage() {
           <div className="lg:col-span-5 lg:sticky lg:top-6">
             <Card className="p-5 bg-white border border-slate-200 shadow-md space-y-4">
               <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-                <h3 className="text-sm font-bold text-slate-900">Resume Source Preview</h3>
-                <span className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                  {isMockResume ? "Sample Document" : "PDF Source"}
+                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <FileText className="size-4 text-emerald-600" />
+                  <span>Resume Source Preview</span>
+                </h3>
+                <span className="text-[10px] uppercase font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                  {isMockResume ? "Sample Document" : "A4 Preview Fit"}
                 </span>
               </div>
 
-              {pdfUrl ? (
-                <div className="w-full h-[550px] rounded-xl overflow-hidden border border-slate-200 bg-slate-50">
-                  <iframe src={pdfUrl} className="w-full h-full" title="Resume Document" />
-                </div>
-              ) : (
-                <div className="flex items-center justify-center p-2 bg-slate-50 rounded-xl border border-slate-200">
-                  <img
-                    src={imageUrl || "/images/resume_01.png"}
-                    alt="Resume preview"
-                    className="max-h-[500px] w-auto object-contain rounded-lg shadow-sm border border-slate-200 bg-white"
-                  />
+              {/* Instant 0ms high-res canvas image preview */}
+              <div className="w-full max-h-[620px] overflow-y-auto bg-slate-900/95 p-3 rounded-xl border border-slate-800 shadow-inner flex justify-center">
+                <img
+                  src={resume.imageDataUrl || imageUrl || (isMockResume ? resume.imagePath : "/images/resume_01.png")}
+                  alt="Resume preview"
+                  className="w-full h-auto object-contain rounded-lg shadow-2xl bg-white border border-slate-200 transition-all duration-300"
+                />
+              </div>
+
+              {pdfUrl && (
+                <div className="pt-1 text-center">
+                  <a
+                    href={pdfUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-600 hover:text-emerald-700 hover:underline"
+                  >
+                    Open Raw PDF Source in New Tab →
+                  </a>
                 </div>
               )}
             </Card>

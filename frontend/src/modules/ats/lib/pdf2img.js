@@ -20,7 +20,7 @@ export async function convertPdfToImage(file) {
     const pdf = await loadingTask.promise;
     
     const page = await pdf.getPage(1);
-    const viewport = page.getViewport({ scale: 1.5 });
+    const viewport = page.getViewport({ scale: 2.0 }); // High resolution 2x scale
     
     const canvas = document.createElement("canvas");
     const context = canvas.getContext("2d");
@@ -36,18 +36,20 @@ export async function convertPdfToImage(file) {
       viewport: viewport,
     }).promise;
     
+    const dataUrl = canvas.toDataURL("image/png");
+
     return new Promise((resolve) => {
       canvas.toBlob((blob) => {
         if (blob) {
           const imgFile = new File([blob], `${file.name.replace(/\.pdf$/i, "")}.png`, { type: "image/png" });
-          resolve({ file: imgFile });
+          resolve({ file: imgFile, dataUrl });
         } else {
-          resolve({ file: null });
+          resolve({ file: null, dataUrl });
         }
       }, "image/png");
     });
   } catch (err) {
     console.error("PDF to Image conversion error:", err);
-    return { file: null };
+    return { file: null, dataUrl: null };
   }
 }

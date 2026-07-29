@@ -56,6 +56,7 @@ export default function ATSUploadPage() {
         id: uuid,
         resumePath: uploadedFile.path,
         imagePath: uploadedImage.path,
+        imageDataUrl: imageFile.dataUrl || "",
         companyName,
         jobTitle,
         jobDescription,
@@ -105,11 +106,13 @@ export default function ATSUploadPage() {
       data.feedback = parsedFeedback;
       await kv.set(`resume:${uuid}`, JSON.stringify(data));
 
+      // Synchronize to local Zustand store
       addResume({
         id: uuid,
         companyName,
         jobTitle,
         imagePath: uploadedImage.path,
+        imageDataUrl: imageFile.dataUrl || "",
         resumePath: uploadedFile.path,
         feedback: parsedFeedback,
       });
