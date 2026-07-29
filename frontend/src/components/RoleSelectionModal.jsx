@@ -34,11 +34,9 @@ export default function RoleSelectionModal({ isOpen, onRoleSelected, userCandida
       <div className="bg-white rounded-3xl border border-slate-200 shadow-2xl max-w-lg w-full p-6 sm:p-8 space-y-6 relative overflow-hidden">
         {/* Header */}
         <div className="text-center space-y-2">
-          <div className="size-14 mx-auto rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-lg shadow-emerald-500/20">
-            <Sparkles className="size-7" />
-          </div>
+          <img src="/logo.svg" alt="Logo" className="h-10 w-auto mx-auto object-contain mb-2" />
           <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight">
-            Welcome to Talent <span className="text-emerald-600">IQ</span>
+            Welcome! Select Your Role
           </h2>
           <p className="text-slate-500 text-xs sm:text-sm">
             Select how you want to use the platform today. You can switch roles later in settings.

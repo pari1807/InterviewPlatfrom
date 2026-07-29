@@ -22,18 +22,8 @@ export default function HomePage() {
       {/* Navigation Bar */}
       <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-slate-200/80 px-6 py-4">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2.5 group">
-            <div className="size-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-              <Sparkles className="size-5" />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-xl text-slate-900 tracking-tight flex items-center gap-1">
-                Talent <span className="text-emerald-600 font-extrabold">IQ</span>
-              </span>
-              <span className="text-xs text-emerald-700 font-medium -mt-1">
-                Remote Interview SaaS
-              </span>
-            </div>
+          <Link to="/" className="flex items-center group py-0.5">
+            <img src="/logo.svg" alt="Logo" className="h-10 w-auto object-contain group-hover:scale-105 transition-transform" />
           </Link>
 
           <SignInButton mode="modal">
@@ -102,7 +92,7 @@ export default function HomePage() {
             <div className="p-2 rounded-3xl bg-gradient-to-b from-slate-200 to-emerald-100 shadow-2xl border border-slate-200">
               <img
                 src="/hero.png"
-                alt="TalentIQ Interview Platform"
+                alt="Remote Interview Platform"
                 className="rounded-2xl w-full h-auto object-cover border border-white"
               />
             </div>

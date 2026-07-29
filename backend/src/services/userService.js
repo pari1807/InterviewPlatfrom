@@ -226,7 +226,7 @@ export async function syncOrCreateUser(clerkId, initialData = {}) {
   Notification.create({
     recipient: user._id,
     sender: user._id,
-    title: "Welcome to Talent IQ!",
+    title: "Welcome to the Platform!",
     message: `Your account is ready. Your permanent Candidate Key is "${user.candidateKey}". Share it with hosts to receive interview invitations.`,
     type: "status_update",
   }).catch(() => {});

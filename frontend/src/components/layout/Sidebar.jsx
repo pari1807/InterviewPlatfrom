@@ -64,16 +64,8 @@ export function Sidebar({ isOpen, onClose }) {
         }`}
       >
         <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-          <Link to="/dashboard" className="flex items-center gap-3 group">
-            <div className="size-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white shadow-md shadow-emerald-500/20 group-hover:scale-105 transition-transform">
-              <Sparkles className="size-5" />
-            </div>
-            <div className="flex flex-col">
-              <span className="font-bold text-lg text-slate-900 tracking-tight flex items-center gap-1">
-                Talent <span className="text-emerald-600 font-extrabold">IQ</span>
-              </span>
-              <span className="text-[11px] font-medium text-emerald-700/80">AI Remote Interview SaaS</span>
-            </div>
+          <Link to="/dashboard" className="flex items-center group py-0.5">
+            <img src="/logo.svg" alt="Logo" className="h-9 w-auto object-contain group-hover:scale-105 transition-transform" />
           </Link>
 
           <button

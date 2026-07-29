@@ -156,7 +156,7 @@ export default function AnalyticsPage() {
 
             <div className="pt-4 border-t border-white/10 text-[11px] text-slate-400 flex items-center justify-between">
               <span>Updated Today</span>
-              <span className="text-emerald-300 font-medium">TalentIQ AI Model v4</span>
+              <span className="text-emerald-300 font-medium">AI Evaluation Engine v4</span>
             </div>
           </Card>
         </div>

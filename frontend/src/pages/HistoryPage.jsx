@@ -155,7 +155,7 @@ export default function HistoryPage() {
                         </h3>
                         <p className="text-xs text-slate-500 flex items-center gap-1">
                           <Building2 className="size-3 text-slate-400" />
-                          <span>TalentIQ Mock Interview</span>
+                          <span>Technical Interview Session</span>
                         </p>
                       </div>
                     </div>
